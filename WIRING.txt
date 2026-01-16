@@ -1,0 +1,213 @@
+================================================================================
+                    ESP32-C3 DUAL JOYSTICK WIRING DIAGRAM
+================================================================================
+
+TRANSMITTER BOARD (with 2 joysticks, OLED, and blinking LED)
+================================================================================
+
+                                 ┌─────────────────┐
+                                 │  ESP32-C3       │
+                                 │  Super Mini     │
+                                 │                 │
+         OLED Display        ┌───┤ GPIO6 (SDA)     │
+       (GND,VCC,SCK,SDA)     │   │ GPIO7 (SCK)     ├───┐
+         ┌──────────┐        │   │                 │   │
+         │  GND  ───┼────────┼───┤ GND             │   │
+         │  VCC  ───┼────────┼───┤ 3.3V            │   │
+         │  SCK  ───┼────────────┤ GPIO7           │   │
+         │  SDA  ───┼────────────┤ GPIO6           │   │
+         └──────────┘            │                 │   │
+                                 │ GPIO8 (LED)     │◄──┤ Built-in LED
+                                 │                 │   │ (Blinks)
+                                 │                 │   │
+         Joystick 1              │                 │   │
+      (GND,5V,VRX,VRY,SW)        │                 │   │
+         ┌──────────┐            │                 │   │
+         │  GND  ───┼────────────┤ GND             │   │
+         │  5V   ───┼────────────┤ 5V              │   │
+         │  VRX  ───┼────────────┤ GPIO0 (ADC)     │   │
+         │  VRY  ───┼────────────┤ GPIO1 (ADC)     │   │
+         │  SW   ───┼────────────┤ GPIO2           │   │
+         └──────────┘            │                 │   │
+                                 │                 │   │
+         Joystick 2              │                 │   │
+      (GND,5V,VRX,VRY,SW)        │                 │   │
+         ┌──────────┐            │                 │   │
+         │  GND  ───┼────────────┤ GND             │   │
+         │  5V   ───┼────────────┤ 5V              │   │
+         │  VRX  ───┼────────────┤ GPIO3 (ADC)     │   │
+         │  VRY  ───┼────────────┤ GPIO4 (ADC)     │   │
+         │  SW   ───┼────────────┤ GPIO5           │   │
+         └──────────┘            │                 │   │
+                                 │                 │   │
+                                 │  USB-C          │◄──── Connect to Computer
+                                 └─────────────────┘
+
+
+RECEIVER BOARD (OLED only)
+================================================================================
+
+                                 ┌─────────────────┐
+                                 │  ESP32-C3       │
+                                 │  Super Mini     │
+                                 │                 │
+         OLED Display            │                 │
+       (GND,VCC,SCK,SDA)         │                 │
+         ┌──────────┐        ┌───┤ GPIO6 (SDA)     │
+         │  GND  ───┼────────┼───┤ GND             │
+         │  VCC  ───┼────────┼───┤ 3.3V            │
+         │  SCK  ───┼────────────┤ GPIO7           │
+         │  SDA  ───┼────────────┤ GPIO6           │
+         └──────────┘            │                 │
+                                 │                 │
+                                 │                 │
+                                 │  USB-C          │◄──── Connect to Computer
+                                 └─────────────────┘
+
+
+PIN SUMMARY
+================================================================================
+
+TRANSMITTER:
+  GPIO0  → Joystick 1 VRx (X-axis analog)
+  GPIO1  → Joystick 1 VRy (Y-axis analog)
+  GPIO2  → Joystick 1 SW  (Button)
+  GPIO3  → Joystick 2 VRx (X-axis analog)
+  GPIO4  → Joystick 2 VRy (Y-axis analog)
+  GPIO5  → Joystick 2 SW  (Button)
+  GPIO6  → OLED SDA (I2C Data)
+  GPIO7  → OLED SCL (I2C Clock)
+  GPIO8  → Built-in LED (Blinks automatically)
+
+RECEIVER:
+  GPIO6  → OLED SDA (I2C Data)
+  GPIO7  → OLED SCL (I2C Clock)
+
+
+JOYSTICK HW-504 PINOUT
+================================================================================
+
+Looking at the joystick module from the front (where the stick is):
+
+      ┌─────────────────┐
+      │                 │
+      │    ○            │  ○ = Joystick
+      │   /│\           │
+      │    │            │
+      ├─────────────────┤
+      │ GND 5V VRX VRY SW │  ← 5 pins at bottom
+      └─────────────────┘
+
+  GND = Ground
+  5V  = Power (can use 3.3V or 5V)
+  VRX = X-axis variable resistor (analog)
+  VRY = Y-axis variable resistor (analog)
+  SW  = Push button switch (active LOW)
+
+
+OLED SSD1306 0.91" PINOUT
+================================================================================
+
+4-pin I2C version (Your module):
+
+      ┌─────────────────┐
+      │   ■  ■  ■  ■    │  ← Display area
+      │   ■  ■  ■  ■    │
+      │                 │
+      ├─────────────────┤
+      │ GND VCC SCK SDA │  ← 4 pins at bottom
+      └─────────────────┘
+
+  GND = Ground
+  VCC = Power (3.3V)
+  SCK = I2C Clock (same as SCL)
+  SDA = I2C Data
+
+  Note: SCK and SCL are the same thing (I2C Clock signal)
+        Your display labels it SCK, some label it SCL
+
+
+POWER CONSIDERATIONS
+================================================================================
+
+1. Joystick Modules:
+   - Can work with 3.3V or 5V
+   - Output voltage range: 0V to supply voltage
+   - ESP32-C3 ADC is 3.3V tolerant
+   - Using 5V: Output is 0-5V (safe, ADC clamps at 3.3V)
+   - Using 3.3V: Output is 0-3.3V (recommended)
+
+2. OLED Display:
+   - Use 3.3V only
+   - Current draw: ~20mA
+   - I2C levels: 3.3V compatible
+
+3. ESP32-C3:
+   - Operating voltage: 3.3V
+   - 5V pin: Direct from USB (unregulated)
+   - 3.3V pin: Regulated output (max 500mA)
+
+
+BLUETOOTH COMMUNICATION
+================================================================================
+
+The two boards communicate wirelessly via BLE (Bluetooth Low Energy):
+
+  ┌──────────────┐               ┌──────────────┐
+  │ Transmitter  │               │  Receiver    │
+  │              │  ~~~BLE~~~>   │              │
+  │ (Server)     │               │  (Client)    │
+  │              │               │              │
+  │ Reads        │  Joy Data     │ Displays     │
+  │ Joysticks    │  @ 10Hz       │ Same Data    │
+  └──────────────┘               └──────────────┘
+
+  - Service UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
+  - Update rate: 100ms (10 times per second)
+  - Range: ~10 meters (depending on environment)
+  - Auto-reconnect on disconnect
+
+
+CONNECTION CHECKLIST
+================================================================================
+
+Before powering on:
+
+Transmitter (check each connection in order):
+  [ ] OLED Pin 1 (GND) → ESP32 GND
+  [ ] OLED Pin 2 (VCC) → ESP32 3.3V
+  [ ] OLED Pin 3 (SCK) → ESP32 GPIO7
+  [ ] OLED Pin 4 (SDA) → ESP32 GPIO6
+  [ ] Joy1 Pin 1 (GND) → ESP32 GND
+  [ ] Joy1 Pin 2 (5V)  → ESP32 5V or 3.3V
+  [ ] Joy1 Pin 3 (VRX) → ESP32 GPIO0
+  [ ] Joy1 Pin 4 (VRY) → ESP32 GPIO1
+  [ ] Joy1 Pin 5 (SW)  → ESP32 GPIO2
+  [ ] Joy2 Pin 1 (GND) → ESP32 GND
+  [ ] Joy2 Pin 2 (5V)  → ESP32 5V or 3.3V
+  [ ] Joy2 Pin 3 (VRX) → ESP32 GPIO3
+  [ ] Joy2 Pin 4 (VRY) → ESP32 GPIO4
+  [ ] Joy2 Pin 5 (SW)  → ESP32 GPIO5
+
+Receiver (check each connection in order):
+  [ ] OLED Pin 1 (GND) → ESP32 GND
+  [ ] OLED Pin 2 (VCC) → ESP32 3.3V
+  [ ] OLED Pin 3 (SCK) → ESP32 GPIO7
+  [ ] OLED Pin 4 (SDA) → ESP32 GPIO6
+
+
+TESTING PROCEDURE
+================================================================================
+
+1. Verify wiring with checklist above
+2. Upload transmitter code
+3. Upload receiver code
+4. Power both boards
+5. Transmitter LED should blink
+6. Wait 5-10 seconds for BLE connection
+7. Both displays should show "Connected"
+8. Move joysticks - displays should update in sync
+
+If problems occur, see QUICKSTART.md or README.md for troubleshooting.
+
+================================================================================
