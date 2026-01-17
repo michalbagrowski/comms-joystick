@@ -5,6 +5,7 @@
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
+#include <ESP32Servo.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
@@ -13,6 +14,7 @@
 
 #define SDA_PIN 6
 #define SCL_PIN 7
+#define SERVO_PIN 0  // GPIO0 for servo control
 
 // Joystick 1 center values (measured at rest)
 #define JOY1_CENTER_X 3515
@@ -26,6 +28,8 @@
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+Servo myServo;  // Create servo object
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -188,12 +192,22 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting Arduino BLE Client application...");
 
+  // Initialize servo
+  myServo.attach(SERVO_PIN);  // Attach servo to GPIO0
+  myServo.write(90);          // Start at center position (90 degrees)
+  Serial.println("Servo initialized at 90 degrees");
+
   Wire.begin(SDA_PIN, SCL_PIN);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
+
+  // Set display brightness/contrast (0-255, default is 127)
+  // Higher = brighter. 255 = maximum brightness
+  display.ssd1306_command(0x81); // Set contrast control
+  display.ssd1306_command(0xFF); // Maximum brightness (255)
 
   display.clearDisplay();
   display.display();
@@ -228,9 +242,15 @@ void loop() {
   }
 
   if (connected) {
+    // Control servo based on Joystick 1 X-axis
+    // Map joystick value (0-4095) to servo angle (0-180 degrees)
+    int servoAngle = map(joystickData.joy1_x, 0, 4095, 0, 180);
+    servoAngle = constrain(servoAngle, 0, 180);  // Ensure within valid range
+    myServo.write(servoAngle);
+
     display.clearDisplay();
 
-    // Display raw values
+    // Display raw values + servo angle
     display.setTextSize(1);
     display.setCursor(0, 0);
     display.print("J1: ");
@@ -243,6 +263,11 @@ void loop() {
     display.print(joystickData.joy2_x);
     display.print(",");
     display.print(joystickData.joy2_y);
+
+    display.setCursor(0, 20);
+    display.print("Servo: ");
+    display.print(servoAngle);
+    display.print((char)247);  // Degree symbol
 
     display.setCursor(118, 0);
     display.print(F("RX"));

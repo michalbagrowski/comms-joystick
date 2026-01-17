@@ -61,6 +61,7 @@ install-libs:
 	@echo "Installing required libraries..."
 	$(ARDUINO_CLI) lib install "Adafruit GFX Library"
 	$(ARDUINO_CLI) lib install "Adafruit SSD1306"
+	$(ARDUINO_CLI) lib install "ESP32Servo"
 	@echo "Libraries installed successfully!"
 
 compile: compile-transmitter compile-receiver

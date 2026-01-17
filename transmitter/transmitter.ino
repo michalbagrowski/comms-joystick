@@ -51,6 +51,30 @@ struct JoystickData {
   uint8_t joy2_sw;
 } joystickData;
 
+// Smoothing filter - exponential moving average
+// Alpha = 0.3 means 30% new value, 70% old value (adjust 0.1-0.5)
+#define SMOOTHING_ALPHA 0.3
+
+// Oversampling - read ADC multiple times and average
+#define ADC_SAMPLES 4
+
+// Filtered values
+float filtered_j1x = 0;
+float filtered_j1y = 0;
+float filtered_j2x = 0;
+float filtered_j2y = 0;
+bool firstRead = true;
+
+// Function to read ADC with oversampling
+int readADC(int pin) {
+  long sum = 0;
+  for (int i = 0; i < ADC_SAMPLES; i++) {
+    sum += analogRead(pin);
+    delayMicroseconds(100); // Small delay between samples
+  }
+  return sum / ADC_SAMPLES;
+}
+
 class MyServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
@@ -147,6 +171,11 @@ void setup() {
     for(;;);
   }
 
+  // Set display brightness/contrast (0-255, default is 127)
+  // Higher = brighter. 255 = maximum brightness
+  display.ssd1306_command(0x81); // Set contrast control
+  display.ssd1306_command(0xFF); // Maximum brightness (255)
+
   display.clearDisplay();
   display.display();
   delay(100);
@@ -198,12 +227,34 @@ void loop() {
   }
 
   if (millis() - lastUpdate > 100) {
-    joystickData.joy1_x = analogRead(JOY1_VRX);
-    joystickData.joy1_y = analogRead(JOY1_VRY);
+    // Read raw ADC values with oversampling
+    int raw_j1x = readADC(JOY1_VRX);
+    int raw_j1y = readADC(JOY1_VRY);
+    int raw_j2x = readADC(JOY2_VRX);
+    int raw_j2y = readADC(JOY2_VRY);
+
+    // Initialize filter on first read
+    if (firstRead) {
+      filtered_j1x = raw_j1x;
+      filtered_j1y = raw_j1y;
+      filtered_j2x = raw_j2x;
+      filtered_j2y = raw_j2y;
+      firstRead = false;
+    }
+
+    // Apply exponential moving average filter
+    filtered_j1x = (SMOOTHING_ALPHA * raw_j1x) + ((1.0 - SMOOTHING_ALPHA) * filtered_j1x);
+    filtered_j1y = (SMOOTHING_ALPHA * raw_j1y) + ((1.0 - SMOOTHING_ALPHA) * filtered_j1y);
+    filtered_j2x = (SMOOTHING_ALPHA * raw_j2x) + ((1.0 - SMOOTHING_ALPHA) * filtered_j2x);
+    filtered_j2y = (SMOOTHING_ALPHA * raw_j2y) + ((1.0 - SMOOTHING_ALPHA) * filtered_j2y);
+
+    // Store filtered values
+    joystickData.joy1_x = (int16_t)filtered_j1x;
+    joystickData.joy1_y = (int16_t)filtered_j1y;
     joystickData.joy1_sw = digitalRead(JOY1_SW);
 
-    joystickData.joy2_x = analogRead(JOY2_VRX);
-    joystickData.joy2_y = analogRead(JOY2_VRY);
+    joystickData.joy2_x = (int16_t)filtered_j2x;
+    joystickData.joy2_y = (int16_t)filtered_j2y;
     joystickData.joy2_sw = digitalRead(JOY2_SW);
 
     Serial.print("J1: X=");
