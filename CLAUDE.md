@@ -1,7 +1,7 @@
 # AI Catch-Up Guide - ESP32 Dual Joystick BLE Project
 
-**Last Updated:** 2026-01-17
-**Status:** Active Development - ADC voltage issue discovered
+**Last Updated:** 2026-01-17  
+**Status:** Servo control added, software filtering implemented, visual displays active
 
 ---
 
@@ -9,7 +9,7 @@
 
 Wireless dual-joystick controller using BLE between two ESP32-C3 boards:
 - **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via BLE at 10Hz
-- **Receiver (RX)**: Receives BLE data, displays same joystick positions on OLED
+- **Receiver (RX)**: Receives BLE data, displays joystick positions + controls servo motor
 
 ---
 
@@ -28,10 +28,14 @@ Wireless dual-joystick controller using BLE between two ESP32-C3 boards:
 - **Board**: ESP32-C3 Super Mini
 - **Display**: SSD1306 OLED 0.91" 128x32 I2C @ 0x3C
   - GPIO6 (SDA), GPIO7 (SCL)
+- **Servo**: SG90 mini servo on GPIO0
+  - Controls based on Joystick 1 X-axis
+  - Range: 0° to 180°
 
 ### Power Configuration
 - **OLED**: 3.3V only (will damage at 5V)
-- **Joysticks**: Currently powered by 5V (ISSUE - see below)
+- **Joysticks**: 3.3V (changed from 5V - RESOLVED)
+- **Servo**: 5V from ESP32 or external supply
 - **ESP32-C3 ADC**: 0-3.3V max, 12-bit (0-4095)
 
 ---
@@ -53,11 +57,11 @@ These values are **device-specific** and stored in code as:
 
 ---
 
-## Current Issues & Solutions
+## Issues Discovered & Solutions Implemented
 
-### ⚠️ CRITICAL ISSUE: ADC Voltage Mismatch
+### ✅ RESOLVED: ADC Voltage Mismatch
 
-**Problem:**
+**Problem (Discovered):**
 - Joysticks powered by **5V** but ESP32-C3 ADC only handles **0-3.3V**
 - Symptoms:
   - Moving joystick "down": Values decrease slowly from 3500, then accelerate
@@ -70,19 +74,58 @@ These values are **device-specific** and stored in code as:
 2. ESP32-C3 ADC clamps input at 3.3V → anything above reads as 4095
 3. ESP32-C3 ADC at 11dB attenuation (default) has non-linear response curve
 
-**Solution (RECOMMENDED):**
+**Solution (IMPLEMENTED):**
 ```
-Change wiring: Connect joystick 5V pins to ESP32 3.3V instead of 5V
+Changed wiring: Joystick 5V pins → ESP32 3.3V pin
 ```
 
-This will:
-- Provide proper 0-3.3V output range
-- Eliminate clipping at 4095
-- Give linear response across full range
-- HW-504 works fine at 3.3V according to datasheet
+**Result:** Better linearity, but still some noise/jitter
 
-**Alternative (NOT RECOMMENDED):**
-Add external voltage divider (5V → 3.3V) but requires additional components.
+### ✅ IMPLEMENTED: Software Filtering
+
+**ADC Noise Issues:**
+- Jitter (±1 value fluctuation) when joystick at rest
+- Some instability at extremes
+- Values not perfectly smooth
+
+**Solution (IMPLEMENTED):**
+1. **Oversampling**: Read ADC 4 times and average (reduces random noise)
+2. **Exponential Moving Average**: Smooth readings over time with alpha=0.3
+3. **Result**: Much smoother, more stable readings
+
+**Code Implementation (transmitter.ino):**
+```c
+#define ADC_SAMPLES 4
+#define SMOOTHING_ALPHA 0.3
+
+int readADC(int pin) {
+  long sum = 0;
+  for (int i = 0; i < ADC_SAMPLES; i++) {
+    sum += analogRead(pin);
+    delayMicroseconds(100);
+  }
+  return sum / ADC_SAMPLES;
+}
+
+// Then apply exponential moving average
+filtered_value = (SMOOTHING_ALPHA * raw_value) + ((1.0 - SMOOTHING_ALPHA) * filtered_value);
+```
+
+**Hardware Filtering (If Needed):**
+- See `HARDWARE_FILTERING.md` for capacitor/RC filter options
+- Add 0.1µF capacitors between ADC pins and GND if software filtering insufficient
+
+### ✅ RESOLVED: Receiver Display Dimness
+
+**Problem:** Receiver OLED appeared dimmer than transmitter
+
+**Solution:** Added explicit brightness control to both displays
+```c
+display.ssd1306_command(0x81); // Set contrast control
+display.ssd1306_command(0xFF); // Maximum brightness (255)
+```
+
+**Also check:** Power supply voltage (should be 3.25-3.35V at OLED VCC pin)
 
 ---
 
@@ -105,16 +148,40 @@ Add external voltage divider (5V → 3.3V) but requires additional components.
 
 ---
 
-## Display Visualization Requirements
+## Display Visualization
 
 **User Request:** Zero state (neutral joystick position) should appear at **bottom-right corner** of circle.
 
-**Current Implementation:**
-- Circle drawn at screen positions: J1(32,18), J2(96,18) with radius 14
-- Crosshairs at bottom-right corner: `(centerX + radius - 3, centerY + radius - 3)`
-- Joystick dot mapped relative to crosshairs position
-- When joystick at rest → dot appears at crosshairs (bottom-right)
-- Movement radiates from that corner
+### Transmitter Display (128x32 pixels)
+```
+┌──────────────────────────────────────────────────┐
+│ J1    ○       J2    ○               TX          │  ← Top: Circles + status
+│       /│\            /│\                         │
+│      ┼─○            ┼─○                          │  ← Crosshairs at bottom-right
+│                                                  │
+│ 3515               3352                          │  ← Bottom: Raw X values
+└──────────────────────────────────────────────────┘
+```
+- **Two joystick circles**: J1(25,12) radius 10, J2(75,12) radius 10
+- **Crosshairs at bottom-right corner** of each circle (zero position)
+- **Joystick dot** position relative to crosshairs
+- **Status indicator**: "TX" or "--" at top-right (118,0)
+- **Raw values**: Bottom shows X values for both joysticks
+
+### Receiver Display (128x32 pixels)
+```
+┌──────────────────────────────────────────────────┐
+│ J1  ○     J2  ○                     RX          │  ← Top: Circles + status
+│     /│\        /│\                               │
+│    ┼─○        ┼─○                                │
+│ S:90°                                            │  ← Servo angle
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░  │  ← Servo bar (0-180°)
+└──────────────────────────────────────────────────┘
+```
+- **Two joystick circles**: J1(25,10) radius 8, J2(75,10) radius 8
+- **Servo position bar**: Bottom (y=28-31), fills left-to-right based on angle
+- **Servo angle text**: "S:XX°" above bar (0,20)
+- **Status indicator**: "RX" at top-right (110,0)
 
 **Mapping Logic:**
 ```c
@@ -135,30 +202,32 @@ int dotY = zeroY + mapY;
 
 ---
 
-## Debug Mode
+## Servo Control
 
-**To enable raw value display** (remove circles, show numbers):
+**Configuration:**
+- **Pin**: GPIO0 (receiver)
+- **Control Source**: Joystick 1 X-axis
+- **Mapping**: Linear 0-4095 → 0-180°
+- **Library**: ESP32Servo
 
-In both `transmitter.ino` and `receiver.ino`, comment out `drawJoystick()` calls and add:
+**Code (receiver.ino):**
 ```c
-display.setTextSize(1);
-display.setCursor(0, 0);
-display.print("J1: ");
-display.print(joystickData.joy1_x);
-display.print(",");
-display.print(joystickData.joy1_y);
-
-display.setCursor(0, 10);
-display.print("J2: ");
-display.print(joystickData.joy2_x);
-display.print(",");
-display.print(joystickData.joy2_y);
+int servoAngle = map(joystickData.joy1_x, 0, 4095, 0, 180);
+servoAngle = constrain(servoAngle, 0, 180);
+myServo.write(servoAngle);
 ```
 
-Use this to:
-- Verify joystick center values
-- Diagnose ADC clipping issues
-- Check BLE transmission accuracy
+**To change control source:** Edit receiver.ino ~line 247
+- Joy1 Y-axis: `joystickData.joy1_y`
+- Joy2 X-axis: `joystickData.joy2_x`
+- Joy2 Y-axis: `joystickData.joy2_y`
+
+**Wiring:**
+- Brown (GND) → ESP32 GND
+- Red (VCC) → ESP32 5V (or external 5V supply for heavy loads)
+- Orange/Yellow (Signal) → ESP32 GPIO0
+
+**See:** `SERVO_SETUP.md` for complete wiring and configuration guide
 
 ---
 
@@ -179,6 +248,7 @@ Detected ports (as of 2026-01-17):
 ```bash
 make all                  # Compile + upload both boards
 make compile              # Compile only
+make install-libs         # Install all libraries (includes ESP32Servo)
 make upload-transmitter   # Upload TX
 make upload-receiver      # Upload RX
 make list-ports           # Show connected boards
@@ -193,14 +263,16 @@ make identify             # Blink LED to identify which board is which
 ```
 /Users/acid/Projects/esp32/comms+joystick/
 ├── transmitter/
-│   └── transmitter.ino       (232+ lines, TX board code)
+│   └── transmitter.ino       (270+ lines, TX with filtering)
 ├── receiver/
-│   └── receiver.ino          (234+ lines, RX board code)
-├── Makefile                  (Build automation)
+│   └── receiver.ino          (275+ lines, RX with servo)
+├── Makefile                  (Build automation with servo lib)
 ├── README.md                 (Main documentation)
 ├── QUICKSTART.md             (Quick start guide)
 ├── PIN_CONNECTIONS.txt       (Exact pin mappings)
 ├── WIRING.txt                (Detailed wiring diagrams)
+├── HARDWARE_FILTERING.md     (Capacitor/RC filter guide)
+├── SERVO_SETUP.md            (Servo wiring and configuration)
 └── AI_CATCHUP.md             (This file)
 ```
 
@@ -215,6 +287,22 @@ if (millis() - lastUpdate > 100) {
   // Do work every 100ms
   lastUpdate = millis();
 }
+```
+
+### Filtering Implementation
+```c
+// Oversampling
+int readADC(int pin) {
+  long sum = 0;
+  for (int i = 0; i < ADC_SAMPLES; i++) {
+    sum += analogRead(pin);
+    delayMicroseconds(100);
+  }
+  return sum / ADC_SAMPLES;
+}
+
+// Exponential moving average
+filtered_j1x = (SMOOTHING_ALPHA * raw_j1x) + ((1.0 - SMOOTHING_ALPHA) * filtered_j1x);
 ```
 
 ### Per-Joystick Center Values
@@ -233,23 +321,6 @@ uint8_t button = digitalRead(JOY_SW);
 // button == HIGH → released
 ```
 
-### BLE Server Callbacks (TX)
-```c
-class MyServerCallbacks: public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) { deviceConnected = true; }
-  void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
-};
-```
-
-### BLE Client Callbacks (RX)
-```c
-static void notifyCallback(BLERemoteCharacteristic*, uint8_t* pData, size_t length, bool isNotify) {
-  if (length == sizeof(joystickData)) {
-    memcpy(&joystickData, pData, sizeof(joystickData));
-  }
-}
-```
-
 ---
 
 ## Known Technical Details
@@ -258,31 +329,22 @@ static void notifyCallback(BLERemoteCharacteristic*, uint8_t* pData, size_t leng
 - **Resolution**: 12-bit (0-4095)
 - **Attenuation**: ADC_11db (default, 0-3.3V range)
 - **Non-linearity**: 11dB attenuation has known non-linear curve on ESP32-C3
-- **Recommendation**: Use 3.3V power for joysticks to avoid issues
+- **Power**: Joysticks now on 3.3V (changed from 5V)
+- **Filtering**: Oversampling (4 samples) + exponential moving average (alpha=0.3)
+
+### Servo Configuration
+- **Model**: SG90 mini servo
+- **Pin**: GPIO0 (receiver)
+- **Control**: Joystick 1 X-axis (linear mapping 0-4095 → 0-180°)
+- **Power**: 5V from ESP32 or external supply
+- **Library**: ESP32Servo
 
 ### I2C Configuration
 - **Custom pins**: GPIO6 (SDA), GPIO7 (SCL) - NOT default ESP32 I2C pins
 - **OLED address**: 0x3C
 - **Display resolution**: 128x32 pixels
+- **Brightness**: Set to maximum (255) on both displays
 - **Refresh rate**: ~100ms (synced with sensor read)
-
-### Direction Detection
-```c
-String getDirection(int x, int y, int centerX, int centerY) {
-  int threshold = 1500;  // Deadzone
-  int dx = x - centerX;
-  int dy = y - centerY;
-
-  if (abs(dx) < threshold && abs(dy) < threshold) return "CENTER";
-
-  // Priority to larger axis
-  if (abs(dx) > abs(dy)) {
-    return (dx > 0) ? "RIGHT" : "LEFT";
-  } else {
-    return (dy > 0) ? "DOWN" : "UP";
-  }
-}
-```
 
 ---
 
@@ -293,6 +355,7 @@ Current branch: main
 Modified files:
   M receiver/receiver.ino
   M transmitter/transmitter.ino
+  M Makefile
 
 Last commit: e8ca6e5 init
 ```
@@ -318,37 +381,69 @@ Last commit: e8ca6e5 init
    - Measured actual joystick center positions (not 3200,3200 as assumed)
    - Updated center values per joystick: J1(3515,3234), J2(3352,3510)
 
-4. **ADC Voltage Issue Discovery**
+4. **ADC Voltage Issue Discovery & Resolution**
    - User reported non-linear behavior: slow down, instant max up
    - Diagnosed as voltage mismatch: 5V joystick → 3.3V ADC
-   - Solution: Change joystick power from 5V to 3.3V pin
+   - Solution: Changed joystick power from 5V to 3.3V pin
+   - Result: Better but still some jitter
 
-5. **Makefile Enhancement**
+5. **Software Filtering Implementation**
+   - Added oversampling: Read ADC 4 times and average
+   - Added exponential moving average filter (alpha=0.3)
+   - Created `HARDWARE_FILTERING.md` guide for capacitor options
+   - Result: Much smoother, more stable readings
+
+6. **Receiver Display Dimness**
+   - User reported receiver OLED dimmer than transmitter
+   - Added explicit brightness control (0x81 command, 0xFF value)
+   - Set both displays to maximum brightness (255)
+   - May also be power supply issue (check 3.3V voltage)
+
+7. **Servo Control Addition**
+   - Added SG90 servo to receiver on GPIO0
+   - Controls based on Joystick 1 X-axis (0-4095 → 0-180°)
+   - Added ESP32Servo library to dependencies
+   - Created `SERVO_SETUP.md` guide with wiring and configuration
+
+8. **Visual Representation Enhancement**
+   - Added visual joystick circles to both displays
+   - Added servo position bar to receiver display
+   - Compact layout: Circles + status + info in 128x32 pixels
+   - Transmitter: Two circles + raw values at bottom
+   - Receiver: Two circles + servo bar + servo angle text
+
+9. **Makefile Enhancement**
    - Auto-detect USB ports
    - `make all` now compiles + uploads both boards
+   - Added ESP32Servo to install-libs target
    - Added port display in upload targets
 
 ---
 
 ## Next Steps / TODO
 
-1. **CRITICAL**: Test with joysticks powered by 3.3V instead of 5V
-2. Verify ADC linearity after voltage change
-3. Re-measure center values if needed (may shift with 3.3V)
-4. Re-enable circle display visualization with corrected calibration
-5. Test full joystick range in all directions
-6. Verify BLE transmission accuracy across full range
-7. Optional: Add smoothing/filtering for jitter reduction
+1. ✅ ~~Test with joysticks powered by 3.3V~~ - DONE
+2. ✅ ~~Add software filtering~~ - DONE (oversampling + EMA)
+3. ✅ ~~Add servo control to receiver~~ - DONE (GPIO0, Joy1 X-axis)
+4. ✅ ~~Add visual representation~~ - DONE (circles + servo bar)
+5. Test full joystick range with filtering in all directions
+6. Verify servo responds smoothly to filtered joystick input
+7. Optional: Add hardware filtering (capacitors) if software filtering insufficient
+8. Optional: Add multiple servos on different GPIO pins
+9. Optional: Add servo smoothing/deadband on receiver side
 
 ---
 
 ## Troubleshooting Quick Reference
 
 ### Problem: Values jump to 4095 immediately
-**Solution**: Joysticks powered by 5V, change to 3.3V
+**Solution**: Joysticks powered by 5V, change to 3.3V (RESOLVED)
 
 ### Problem: Joystick center not at crosshairs
-**Solution**: Enable debug mode, measure actual center values, update constants
+**Solution**: Enable debug mode, measure actual center values, update constants (RESOLVED)
+
+### Problem: Values jitter ±1 when stationary
+**Solution**: Software filtering enabled (oversampling + EMA), add capacitors if needed
 
 ### Problem: Can't upload to boards
 **Solution**: Run `make list-ports` to verify connections, check TX_PORT/RX_PORT
@@ -360,7 +455,19 @@ Last commit: e8ca6e5 init
 **Solution**: Run `make identify` to blink first board LED, verify physical layout
 
 ### Problem: Non-linear joystick response
-**Solution**: Verify 3.3V power, check ADC attenuation setting
+**Solution**: Verify 3.3V power, check ADC attenuation setting, software filtering enabled (RESOLVED)
+
+### Problem: Servo jitters or doesn't move smoothly
+**Solution**: Check wiring, verify power (5V), add capacitor filtering, check BLE connection stable
+
+### Problem: Receiver display dimmer than transmitter
+**Solution**: Brightness now set to max (255), check 3.3V voltage at OLED, verify wiring quality
+
+### Problem: Servo doesn't move
+**Solution**: Check signal wire to GPIO0, verify 5V power, see `SERVO_SETUP.md`
+
+### Problem: ESP32 resets when servo moves
+**Solution**: Use external 5V power supply for servo (insufficient current from USB)
 
 ---
 
@@ -370,16 +477,19 @@ Last commit: e8ca6e5 init
 - [ESP32 ADC Non-linear Issues](https://www.esp32.com/viewtopic.php?t=2881)
 - [HW-504 Joystick Specifications](https://components101.com/modules/joystick-module)
 - [Arduino ESP32 ADC Documentation](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/adc.html)
+- [ESP32Servo Library](https://github.com/madhephaestus/ESP32Servo)
 
 ---
 
 ## Important Notes for Future Sessions
 
-1. **User prefers:** Numbers displayed clearly for debugging, circles for visualization
+1. **User prefers:** Visual circles for operation, numbers for debugging
 2. **Zero position:** Must be at bottom-right corner (user requirement)
-3. **Multiple joysticks tested:** Issue is not hardware defect, it's voltage mismatch
+3. **Multiple joysticks tested:** Issue is not hardware defect, it's voltage mismatch (RESOLVED)
 4. **Center values are device-specific:** Always measure, don't assume
-5. **ADC non-linearity:** Known ESP32-C3 issue at 11dB attenuation with >3.3V input
+5. **ADC non-linearity:** Known ESP32-C3 issue at 11dB attenuation with >3.3V input (RESOLVED)
+6. **Filtering is essential:** Software filtering implemented, hardware filtering optional
+7. **Servo control:** Currently Joy1 X-axis, easily configurable to other axes
 
 ---
 

@@ -250,27 +250,28 @@ void loop() {
 
     display.clearDisplay();
 
-    // Display raw values + servo angle
+    // Draw joystick visualizations (smaller circles for compact display)
+    drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 25, 10, 8, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
+    drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 75, 10, 8, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
+
+    // Draw status indicator
     display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.print("J1: ");
-    display.print(joystickData.joy1_x);
-    display.print(",");
-    display.print(joystickData.joy1_y);
+    display.setCursor(110, 0);
+    display.print(F("RX"));
 
-    display.setCursor(0, 10);
-    display.print("J2: ");
-    display.print(joystickData.joy2_x);
-    display.print(",");
-    display.print(joystickData.joy2_y);
+    // Draw servo position bar at bottom
+    // Bar from x=0 to x=127, height 4 pixels at y=28-31
+    display.drawRect(0, 28, 128, 4, SSD1306_WHITE);  // Outer frame
 
+    // Fill bar based on servo angle (0-180 maps to 2-126 pixels)
+    int barWidth = map(servoAngle, 0, 180, 2, 126);
+    display.fillRect(1, 29, barWidth, 2, SSD1306_WHITE);
+
+    // Draw servo angle text above bar
     display.setCursor(0, 20);
-    display.print("Servo: ");
+    display.print("S:");
     display.print(servoAngle);
     display.print((char)247);  // Degree symbol
-
-    display.setCursor(118, 0);
-    display.print(F("RX"));
 
     display.display();
   } else if (doScan) {

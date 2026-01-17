@@ -271,26 +271,25 @@ void loop() {
 
     display.clearDisplay();
 
-    // Display raw values
+    // Draw joystick visualizations (smaller circles for compact display)
+    drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 25, 12, 10, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
+    drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 75, 12, 10, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
+
+    // Draw status indicator
     display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.print("J1: ");
-    display.print(joystickData.joy1_x);
-    display.print(",");
-    display.print(joystickData.joy1_y);
-
-    display.setCursor(0, 10);
-    display.print("J2: ");
-    display.print(joystickData.joy2_x);
-    display.print(",");
-    display.print(joystickData.joy2_y);
-
-    display.setCursor(118, 0);
+    display.setCursor(110, 0);
     if (deviceConnected) {
       display.print(F("TX"));
     } else {
       display.print(F("--"));
     }
+
+    // Draw bottom info bar with raw values
+    display.setCursor(0, 25);
+    display.setTextSize(1);
+    display.print(joystickData.joy1_x);
+    display.setCursor(52, 25);
+    display.print(joystickData.joy2_x);
 
     display.display();
 
