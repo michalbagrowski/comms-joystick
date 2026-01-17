@@ -14,6 +14,14 @@
 #define SDA_PIN 6
 #define SCL_PIN 7
 
+// Joystick 1 center values (measured at rest)
+#define JOY1_CENTER_X 3515
+#define JOY1_CENTER_Y 3234
+
+// Joystick 2 center values (measured at rest)
+#define JOY2_CENTER_X 3352
+#define JOY2_CENTER_Y 3510
+
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
@@ -34,9 +42,7 @@ struct JoystickData {
   uint8_t joy2_sw;
 } joystickData;
 
-String getDirection(int x, int y) {
-  int centerX = 2048;
-  int centerY = 2048;
+String getDirection(int x, int y, int centerX, int centerY) {
   int threshold = 1500;
 
   int dx = x - centerX;
@@ -51,21 +57,32 @@ String getDirection(int x, int y) {
   }
 }
 
-void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int centerY, int radius, const char* label) {
+void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int centerY, int radius, const char* label, int joyCenterX, int joyCenterY) {
   display.drawCircle(centerX, centerY, radius, SSD1306_WHITE);
 
-  display.drawFastHLine(centerX - radius + 2, centerY, (radius - 2) * 2, SSD1306_WHITE);
-  display.drawFastVLine(centerX, centerY - radius + 2, (radius - 2) * 2, SSD1306_WHITE);
+  // Zero state position (bottom-right corner of circle)
+  int zeroX = centerX + (radius - 3);
+  int zeroY = centerY + (radius - 3);
 
-  int offsetX = joyX - 2048;
-  int offsetY = joyY - 2048;
+  // Draw crosshairs at zero state position
+  display.drawFastHLine(zeroX - 4, zeroY, 8, SSD1306_WHITE);
+  display.drawFastVLine(zeroX, zeroY - 4, 8, SSD1306_WHITE);
 
-  int mapX = map(offsetX, -2048, 2047, -radius + 3, radius - 3);
-  int mapY = map(offsetY, -2048, 2047, -radius + 3, radius - 3);
+  // Calculate offset from joystick center
+  int offsetX = joyX - joyCenterX;
+  int offsetY = joyY - joyCenterY;
 
-  int dotX = centerX + mapX;
-  int dotY = centerY + mapY;
+  // Map to screen coordinates: offset=0 should appear at bottom-right corner
+  // Full left (offset=-joyCenterX) should map to -2*(radius-3) from zero
+  // Full right (offset=4095-joyCenterX) should map to 0 from zero
+  int mapX = map(offsetX, -joyCenterX, 4095 - joyCenterX, -2*(radius - 3), 0);
+  int mapY = map(offsetY, -joyCenterY, 4095 - joyCenterY, -2*(radius - 3), 0);
 
+  // Position dot relative to zero state (bottom-right corner)
+  int dotX = zeroX + mapX;
+  int dotY = zeroY + mapY;
+
+  // Constrain to circle boundary
   int dx = dotX - centerX;
   int dy = dotY - centerY;
   int distSq = dx * dx + dy * dy;
@@ -213,10 +230,20 @@ void loop() {
   if (connected) {
     display.clearDisplay();
 
-    drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1");
-    drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2");
-
+    // Display raw values
     display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.print("J1: ");
+    display.print(joystickData.joy1_x);
+    display.print(",");
+    display.print(joystickData.joy1_y);
+
+    display.setCursor(0, 10);
+    display.print("J2: ");
+    display.print(joystickData.joy2_x);
+    display.print(",");
+    display.print(joystickData.joy2_y);
+
     display.setCursor(118, 0);
     display.print(F("RX"));
 

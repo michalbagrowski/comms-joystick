@@ -7,16 +7,17 @@ BOARD_NAME = esp32:esp32
 TX_SKETCH = transmitter/transmitter.ino
 RX_SKETCH = receiver/receiver.ino
 
-TX_PORT ?= /dev/cu.usbserial-*
-RX_PORT ?= /dev/cu.usbserial-*
+TX_PORT ?= $(shell arduino-cli board list | grep "Serial Port (USB)" | head -n1 | awk '{print $$1}')
+RX_PORT ?= $(shell arduino-cli board list | grep "Serial Port (USB)" | tail -n1 | awk '{print $$1}')
 
-all: compile
+all: compile upload-transmitter upload-receiver
 
 help:
 	@echo "ESP32-C3 Joystick Communication Project"
 	@echo "========================================"
 	@echo ""
 	@echo "Available targets:"
+	@echo "  all                - Compile and upload to both boards"
 	@echo "  install-cli        - Install Arduino CLI (macOS)"
 	@echo "  install-core       - Install ESP32 board support"
 	@echo "  install-libs       - Install required libraries"
@@ -29,9 +30,11 @@ help:
 	@echo "  monitor-receiver   - Serial monitor for receiver"
 	@echo "  clean              - Clean build files"
 	@echo "  list-ports         - List available serial ports"
+	@echo "  identify           - Identify which physical board is which"
 	@echo ""
 	@echo "Example usage:"
 	@echo "  make install-libs"
+	@echo "  make all TX_PORT=/dev/cu.usbserial-1234 RX_PORT=/dev/cu.usbserial-5678"
 	@echo "  make compile"
 	@echo "  make upload-transmitter TX_PORT=/dev/cu.usbserial-1234"
 	@echo "  make upload-receiver RX_PORT=/dev/cu.usbserial-5678"
@@ -71,10 +74,12 @@ compile-receiver:
 	$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) $(RX_SKETCH)
 
 upload-transmitter:
+	@echo "Detected TX port: $(TX_PORT)"
 	@echo "Uploading transmitter to $(TX_PORT)..."
 	$(ARDUINO_CLI) upload -p $(TX_PORT) --fqbn $(BOARD_FQBN) $(TX_SKETCH)
 
 upload-receiver:
+	@echo "Detected RX port: $(RX_PORT)"
 	@echo "Uploading receiver to $(RX_PORT)..."
 	$(ARDUINO_CLI) upload -p $(RX_PORT) --fqbn $(BOARD_FQBN) $(RX_SKETCH)
 
@@ -89,6 +94,22 @@ monitor-receiver:
 list-ports:
 	@echo "Available serial ports:"
 	@$(ARDUINO_CLI) board list
+	@echo ""
+	@echo "Auto-detected ports:"
+	@echo "  TX_PORT = $(TX_PORT)"
+	@echo "  RX_PORT = $(RX_PORT)"
+
+identify:
+	@echo "This will help you identify which board is which."
+	@echo ""
+	@echo "First board ($(TX_PORT)) will blink its LED..."
+	@echo "If this is your TRANSMITTER board (the one with joysticks), press Ctrl+C and run 'make all'"
+	@echo "If this is your RECEIVER board, swap the USB cables and run 'make all' again"
+	@echo ""
+	@echo "Press Enter to continue..."
+	@read dummy
+	@echo "int ledPin = 8; void setup() { pinMode(ledPin, OUTPUT); } void loop() { digitalWrite(ledPin, HIGH); delay(200); digitalWrite(ledPin, LOW); delay(200); }" > /tmp/blink_test.ino
+	$(ARDUINO_CLI) upload -p $(TX_PORT) --fqbn $(BOARD_FQBN) /tmp/blink_test.ino 2>/dev/null || true
 
 clean:
 	@echo "Cleaning build files..."
