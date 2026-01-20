@@ -1,6 +1,10 @@
-# ESP32-C3 Dual Joystick BLE Communication System
+# ESP32-C3 Dual Joystick Wireless Communication System
 
-This project implements Bluetooth Low Energy (BLE) communication between two ESP32-C3 Super Mini boards. One board reads two joystick modules and transmits the data to the second board, with both displaying the joystick positions on OLED displays.
+This project implements wireless communication between two ESP32-C3 Super Mini boards with **two communication modes**:
+- **BLE Mode (Default):** Bluetooth Low Energy for simple setup and low power
+- **WiFi Mode:** UDP over WiFi for longer range and lower latency
+
+One board reads two joystick modules and transmits the data to the second board, with both displaying the joystick positions on OLED displays and controlling a servo motor.
 
 ## Hardware Requirements
 
@@ -12,11 +16,18 @@ This project implements Bluetooth Low Energy (BLE) communication between two ESP
 
 ## Features
 
+- **Dual Communication Modes:**
+  - BLE mode for simple setup and low power (default)
+  - WiFi mode for longer range (50-100m) and lower latency
+  - Compile-time switching (no hardware changes required)
 - Dual joystick input with button support
-- Real-time BLE data transmission
-- OLED display on both boards showing joystick directions
+- Real-time wireless data transmission @ 10Hz
+- OLED displays with visual joystick position indicators
+- Servo motor control based on joystick input
+- Software filtering for smooth, stable readings
 - LED blinking indicator on transmitter
-- Automatic reconnection handling
+- Automatic reconnection/discovery handling
+- mDNS discovery in WiFi mode
 
 ## Wiring Diagrams
 
@@ -118,19 +129,71 @@ make install-libs
 This installs:
 - Adafruit GFX Library
 - Adafruit SSD1306
+- ESP32Servo
+
+### 4. Choose Communication Mode
+
+The project supports two communication modes. **BLE mode is enabled by default** and requires no changes.
+
+#### Option A: BLE Mode (Default)
+- No configuration needed
+- Ready to compile and upload
+- Range: 10-30m
+- Lower power consumption
+
+#### Option B: WiFi Mode (Optional)
+To enable WiFi mode:
+
+1. **Edit both files** (`transmitter/transmitter.ino` and `receiver/receiver.ino`):
+   ```cpp
+   // Uncomment this line (around line 5):
+   #define USE_WIFI
+   ```
+
+2. **Configure WiFi network** (if different from default):
+   ```cpp
+   #define WIFI_SSID "your-network-name"
+   #define WIFI_PASSWORD "your-password"
+   ```
+
+3. **Compile and upload** using WiFi targets (see below)
+
+**WiFi Mode Benefits:**
+- Longer range: 50-100m
+- Lower latency: ~50-100ms
+- Works with existing WiFi network
+
+**See WIFI_SETUP.md for detailed WiFi configuration guide.**
 
 ## Compilation
 
-### Compile Both Projects
+### BLE Mode (Default)
+
+Compile both projects:
 ```bash
 make compile
 ```
 
-### Compile Individual Projects
+Compile individual projects:
 ```bash
 make compile-transmitter
 make compile-receiver
 ```
+
+### WiFi Mode
+
+Compile both projects (WiFi mode):
+```bash
+make wifi-compile
+```
+
+Compile individual projects (WiFi mode):
+```bash
+make wifi-compile-transmitter
+make wifi-compile-receiver
+```
+
+**Note:** WiFi mode requires `#define USE_WIFI` uncommented in both `.ino` files.
 
 ## Uploading to Boards
 
@@ -144,14 +207,28 @@ This will show available ports, typically:
 - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
 - Windows: `COM3`, `COM4`, etc.
 
-### 2. Upload Transmitter
+### 2. Upload Both Boards
+
+**BLE Mode:**
 ```bash
-make upload-transmitter TX_PORT=/dev/cu.usbserial-1234
+make all  # Compiles and uploads both boards
 ```
 
-### 3. Upload Receiver
+Or individually:
 ```bash
+make upload-transmitter TX_PORT=/dev/cu.usbserial-1234
 make upload-receiver RX_PORT=/dev/cu.usbserial-5678
+```
+
+**WiFi Mode:**
+```bash
+make wifi-all  # Compiles and uploads both boards (WiFi mode)
+```
+
+Or individually:
+```bash
+make wifi-upload-transmitter TX_PORT=/dev/cu.usbserial-1234
+make wifi-upload-receiver RX_PORT=/dev/cu.usbserial-5678
 ```
 
 ## Serial Monitor
@@ -170,25 +247,60 @@ Press `Ctrl+C` to exit the monitor.
 
 ## Usage
 
+### BLE Mode
 1. Power on both ESP32 boards
 2. The transmitter will start advertising as "ESP32_Joystick_TX"
 3. The receiver will scan and automatically connect
 4. Move the joysticks - both displays will show:
-   - Connection status
-   - Joystick 1 direction (UP/DOWN/LEFT/RIGHT/CENTER)
-   - Joystick 2 direction (UP/DOWN/LEFT/RIGHT/CENTER)
-   - Button press status
+   - Visual joystick position circles
+   - Connection status ("TX" or "RX")
+   - Joystick raw values
+   - Servo position (receiver only)
 5. The transmitter's built-in LED will blink every 500ms
+6. Servo responds to Joystick 1 X-axis movement (0-180°)
 
-## Display Output Format
+### WiFi Mode
+1. Power on both ESP32 boards
+2. Both boards connect to configured WiFi network ("amplifi" by default)
+3. Receiver discovers transmitter via mDNS (esp32-joystick-tx.local)
+4. Move the joysticks - both displays will show:
+   - Visual joystick position circles
+   - Connection status ("WiFi")
+   - Joystick raw values
+   - Servo position (receiver only)
+5. The transmitter's built-in LED will blink every 500ms
+6. Servo responds to Joystick 1 X-axis movement (0-180°)
 
+**Range:** BLE ~10-30m, WiFi ~50-100m
+
+## Display Output
+
+### Transmitter Display
 ```
-TX: Connected       (or "TX: Waiting..." / "RX: Connected" / "RX: Scanning...")
-J1: RIGHT
-J2: UP
-J1: PRESSED         (only shown when button pressed)
-J2: PRESSED         (only shown when button pressed)
+┌──────────────────────────────────────┐
+│ J1    ○       J2    ○        WiFi/TX │  ← Joystick circles + status
+│       /│\            /│\              │
+│      ┼─○            ┼─○               │  ← Crosshairs show zero position
+│                                       │
+│ 3515               3352               │  ← Raw X values
+└──────────────────────────────────────┘
 ```
+
+### Receiver Display
+```
+┌──────────────────────────────────────┐
+│ J1  ○     J2  ○              WiFi/RX │  ← Joystick circles + status
+│     /│\        /│\                    │
+│    ┼─○        ┼─○                     │
+│ S:90°                                 │  ← Servo angle
+│ ▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░ │  ← Servo position bar
+└──────────────────────────────────────┘
+```
+
+**Status Indicators:**
+- BLE mode: "TX" / "RX" (top right)
+- WiFi mode: "WiFi" (top right)
+- Button press: Filled circle (hollow when released)
 
 ## Troubleshooting
 
@@ -208,6 +320,14 @@ J2: PRESSED         (only shown when button pressed)
 - Check serial monitor for connection logs
 - Ensure only one receiver is trying to connect
 
+### WiFi Connection Issues
+- Verify SSID and password in code match your network
+- Ensure 2.4GHz WiFi is enabled (ESP32-C3 doesn't support 5GHz)
+- Check router allows mDNS/Bonjour (or receiver will use broadcast fallback)
+- Verify both boards get IP addresses (check serial monitor)
+- Ensure UDP port 4210 is not blocked by firewall
+- See `WIFI_SETUP.md` for detailed WiFi troubleshooting
+
 ### Compilation Errors
 - Ensure ESP32 core is installed: `make install-core`
 - Verify libraries are installed: `make install-libs`
@@ -222,26 +342,52 @@ J2: PRESSED         (only shown when button pressed)
 
 ```
 .
-├── Makefile                  # Build automation
+├── Makefile                  # Build automation (BLE + WiFi targets)
 ├── README.md                 # This file
+├── WIFI_SETUP.md             # WiFi configuration guide
+├── CLAUDE.md                 # AI catch-up guide
+├── SERVO_SETUP.md            # Servo configuration
+├── HARDWARE_FILTERING.md     # ADC filtering guide
 ├── transmitter/
-│   └── transmitter.ino       # Transmitter code
+│   └── transmitter.ino       # Transmitter code (BLE + WiFi)
 └── receiver/
-    └── receiver.ino          # Receiver code
+    └── receiver.ino          # Receiver code (BLE + WiFi + servo)
 ```
 
 ## Technical Details
 
-### BLE Configuration
+### Communication Modes
+
+**BLE Configuration:**
 - Service UUID: `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
 - Characteristic UUID: `beb5483e-36e1-4688-b7f5-ea07361b26a8`
 - Update Rate: 100ms (10Hz)
-- Data Structure: 12 bytes (6x int16_t/uint8_t)
+- Range: 10-30m
+- Power: Low
+
+**WiFi Configuration:**
+- Protocol: UDP
+- Port: 4210
+- Network: "amplifi" (SSID), "123qwe123" (password)
+- Discovery: mDNS (esp32-joystick-tx.local)
+- Update Rate: 100ms (10Hz)
+- Range: 50-100m
+- Power: Higher
+
+**Data Structure (Both Modes):**
+- 12 bytes: 2x joysticks, each with X/Y (int16_t) + button (uint8_t)
 
 ### Joystick Calibration
-- Center value: ~2048 (12-bit ADC)
-- Threshold: 1000 units
-- Adjust in `getDirection()` function if needed
+- Center values (measured): J1(3515, 3234), J2(3352, 3510)
+- ADC resolution: 12-bit (0-4095)
+- Software filtering: Oversampling (4x) + exponential moving average (α=0.3)
+- Threshold: 1500 units for direction detection
+
+### Servo Control
+- GPIO: 0 (receiver)
+- Control source: Joystick 1 X-axis
+- Range: 0-180°
+- Library: ESP32Servo
 
 ### LED Blink Rate
 - 500ms on/off cycle (1Hz)
@@ -264,8 +410,16 @@ if (millis() - lastBlink > 500) {  // Change 500 to desired ms
 ### Change Direction Threshold
 Edit `getDirection()` function:
 ```cpp
-int threshold = 1000;  // Increase for less sensitivity
+int threshold = 1500;  // Increase for less sensitivity
 ```
+
+### Switch Between BLE and WiFi
+1. Edit both `.ino` files
+2. Uncomment `#define USE_WIFI` for WiFi mode
+3. Comment it out for BLE mode
+4. Recompile and upload
+
+See `WIFI_SETUP.md` for detailed WiFi configuration.
 
 ## License
 
@@ -277,3 +431,5 @@ Built with:
 - Arduino IDE/CLI
 - ESP32 Arduino Core
 - Adafruit GFX & SSD1306 libraries
+- ESP32Servo library
+- ESP32 WiFi & mDNS libraries

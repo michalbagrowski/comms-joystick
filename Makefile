@@ -1,4 +1,4 @@
-.PHONY: all install-cli install-core install-libs compile-transmitter compile-receiver compile upload-transmitter upload-receiver clean monitor-transmitter monitor-receiver help
+.PHONY: all install-cli install-core install-libs compile-transmitter compile-receiver compile upload-transmitter upload-receiver clean monitor-transmitter monitor-receiver help wifi-compile-transmitter wifi-compile-receiver wifi-compile wifi-upload-transmitter wifi-upload-receiver wifi-all
 
 ARDUINO_CLI = arduino-cli
 BOARD_FQBN = esp32:esp32:esp32c3
@@ -17,13 +17,13 @@ help:
 	@echo "========================================"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  all                - Compile and upload to both boards"
+	@echo "  all                - Compile and upload to both boards (BLE mode)"
 	@echo "  install-cli        - Install Arduino CLI (macOS)"
 	@echo "  install-core       - Install ESP32 board support"
 	@echo "  install-libs       - Install required libraries"
-	@echo "  compile            - Compile both transmitter and receiver"
-	@echo "  compile-transmitter- Compile transmitter only"
-	@echo "  compile-receiver   - Compile receiver only"
+	@echo "  compile            - Compile both transmitter and receiver (BLE mode)"
+	@echo "  compile-transmitter- Compile transmitter only (BLE mode)"
+	@echo "  compile-receiver   - Compile receiver only (BLE mode)"
 	@echo "  upload-transmitter - Upload transmitter (set TX_PORT=/dev/cu.xxx)"
 	@echo "  upload-receiver    - Upload receiver (set RX_PORT=/dev/cu.xxx)"
 	@echo "  monitor-transmitter- Serial monitor for transmitter"
@@ -32,9 +32,18 @@ help:
 	@echo "  list-ports         - List available serial ports"
 	@echo "  identify           - Identify which physical board is which"
 	@echo ""
+	@echo "WiFi Mode Targets:"
+	@echo "  wifi-all                - Compile and upload both boards (WiFi mode)"
+	@echo "  wifi-compile            - Compile both transmitter and receiver (WiFi mode)"
+	@echo "  wifi-compile-transmitter- Compile transmitter only (WiFi mode)"
+	@echo "  wifi-compile-receiver   - Compile receiver only (WiFi mode)"
+	@echo "  wifi-upload-transmitter - Upload transmitter (WiFi mode)"
+	@echo "  wifi-upload-receiver    - Upload receiver (WiFi mode)"
+	@echo ""
 	@echo "Example usage:"
 	@echo "  make install-libs"
-	@echo "  make all TX_PORT=/dev/cu.usbserial-1234 RX_PORT=/dev/cu.usbserial-5678"
+	@echo "  make all                # BLE mode (default)"
+	@echo "  make wifi-all           # WiFi mode"
 	@echo "  make compile"
 	@echo "  make upload-transmitter TX_PORT=/dev/cu.usbserial-1234"
 	@echo "  make upload-receiver RX_PORT=/dev/cu.usbserial-5678"
@@ -83,6 +92,32 @@ upload-receiver:
 	@echo "Detected RX port: $(RX_PORT)"
 	@echo "Uploading receiver to $(RX_PORT)..."
 	$(ARDUINO_CLI) upload -p $(RX_PORT) --fqbn $(BOARD_FQBN) $(RX_SKETCH)
+
+# ========================================
+# WiFi Mode Targets
+# ========================================
+wifi-compile: wifi-compile-transmitter wifi-compile-receiver
+
+wifi-compile-transmitter:
+	@echo "Compiling transmitter (WiFi mode)..."
+	$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) --build-property "compiler.cpp.extra_flags=-DUSE_WIFI" $(TX_SKETCH)
+
+wifi-compile-receiver:
+	@echo "Compiling receiver (WiFi mode)..."
+	$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) --build-property "compiler.cpp.extra_flags=-DUSE_WIFI" $(RX_SKETCH)
+
+wifi-upload-transmitter: wifi-compile-transmitter
+	@echo "Detected TX port: $(TX_PORT)"
+	@echo "Uploading transmitter (WiFi mode) to $(TX_PORT)..."
+	$(ARDUINO_CLI) upload -p $(TX_PORT) --fqbn $(BOARD_FQBN) $(TX_SKETCH)
+
+wifi-upload-receiver: wifi-compile-receiver
+	@echo "Detected RX port: $(RX_PORT)"
+	@echo "Uploading receiver (WiFi mode) to $(RX_PORT)..."
+	$(ARDUINO_CLI) upload -p $(RX_PORT) --fqbn $(BOARD_FQBN) $(RX_SKETCH)
+
+wifi-all: wifi-compile wifi-upload-transmitter wifi-upload-receiver
+	@echo "WiFi mode upload complete!"
 
 monitor-transmitter:
 	@echo "Opening serial monitor for transmitter on $(TX_PORT)..."

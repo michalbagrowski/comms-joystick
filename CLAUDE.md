@@ -1,15 +1,23 @@
-# AI Catch-Up Guide - ESP32 Dual Joystick BLE Project
+# AI Catch-Up Guide - ESP32 Dual Joystick BLE/WiFi Project
 
-**Last Updated:** 2026-01-17  
-**Status:** Servo control added, software filtering implemented, visual displays active
+**Last Updated:** 2026-01-19
+**Status:** WiFi mode added, compile-time switching implemented, dual communication modes supported
 
 ---
 
 ## Quick Project Summary
 
-Wireless dual-joystick controller using BLE between two ESP32-C3 boards:
+Wireless dual-joystick controller with **two communication modes** between ESP32-C3 boards:
+
+### BLE Mode (Default)
 - **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via BLE at 10Hz
 - **Receiver (RX)**: Receives BLE data, displays joystick positions + controls servo motor
+
+### WiFi Mode (Optional)
+- **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via UDP/WiFi at 10Hz
+- **Receiver (RX)**: Receives UDP packets, displays joystick positions + controls servo motor
+- **Network**: Connects to "amplifi" WiFi network
+- **Discovery**: Automatic via mDNS (esp32-joystick-tx.local)
 
 ---
 
@@ -129,22 +137,59 @@ display.ssd1306_command(0xFF); // Maximum brightness (255)
 
 ---
 
-## BLE Communication Protocol
+## Communication Modes
+
+The project supports **two communication modes** selectable at compile-time:
+
+### BLE Mode (Default)
+
+**When to use:** Simple setup, low power, short range (10-30m)
 
 - **Service UUID**: `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
 - **Characteristic UUID**: `beb5483e-36e1-4688-b7f5-ea07361b26a8`
 - **Update Rate**: 100ms (10 Hz)
-- **Data Structure**: 12 bytes packed struct
-  ```c
-  struct JoystickData {
-    int16_t joy1_x;    // 2 bytes
-    int16_t joy1_y;    // 2 bytes
-    uint8_t joy1_sw;   // 1 byte (LOW=pressed, HIGH=released)
-    int16_t joy2_x;    // 2 bytes
-    int16_t joy2_y;    // 2 bytes
-    uint8_t joy2_sw;   // 1 byte
-  } // Total: 12 bytes
-  ```
+- **Range**: 10-30m
+- **Power**: Low
+- **Setup**: Automatic pairing
+
+### WiFi Mode (Optional)
+
+**When to use:** Longer range (50-100m), lower latency, existing WiFi network
+
+- **Protocol**: UDP
+- **Port**: 4210
+- **Network**: "amplifi" (SSID: "amplifi", Password: "123qwe123")
+- **Discovery**: mDNS (esp32-joystick-tx.local) with broadcast fallback
+- **Update Rate**: 100ms (10 Hz)
+- **Range**: 50-100m
+- **Power**: Higher
+- **Setup**: Requires WiFi network
+
+### Data Structure (Same for Both Modes)
+
+```c
+struct JoystickData {
+  int16_t joy1_x;    // 2 bytes
+  int16_t joy1_y;    // 2 bytes
+  uint8_t joy1_sw;   // 1 byte (LOW=pressed, HIGH=released)
+  int16_t joy2_x;    // 2 bytes
+  int16_t joy2_y;    // 2 bytes
+  uint8_t joy2_sw;   // 1 byte
+} // Total: 12 bytes
+```
+
+### Switching Between Modes
+
+**To enable WiFi mode:**
+1. Edit both `transmitter/transmitter.ino` and `receiver/receiver.ino`
+2. Uncomment: `#define USE_WIFI` (line ~5)
+3. Compile and upload: `make wifi-all`
+
+**To return to BLE mode:**
+1. Comment out: `// #define USE_WIFI`
+2. Compile and upload: `make all`
+
+**No other changes required** - pin assignments, servo control, and display layout remain the same.
 
 ---
 
@@ -165,7 +210,9 @@ display.ssd1306_command(0xFF); // Maximum brightness (255)
 - **Two joystick circles**: J1(25,12) radius 10, J2(75,12) radius 10
 - **Crosshairs at bottom-right corner** of each circle (zero position)
 - **Joystick dot** position relative to crosshairs
-- **Status indicator**: "TX" or "--" at top-right (118,0)
+- **Status indicator**:
+  - BLE mode: "TX" or "--" at top-right (110,0)
+  - WiFi mode: "WiFi" or "----" at top-right (98,0)
 - **Raw values**: Bottom shows X values for both joysticks
 
 ### Receiver Display (128x32 pixels)
@@ -181,7 +228,9 @@ display.ssd1306_command(0xFF); // Maximum brightness (255)
 - **Two joystick circles**: J1(25,10) radius 8, J2(75,10) radius 8
 - **Servo position bar**: Bottom (y=28-31), fills left-to-right based on angle
 - **Servo angle text**: "S:XX°" above bar (0,20)
-- **Status indicator**: "RX" at top-right (110,0)
+- **Status indicator**:
+  - BLE mode: "RX" at top-right (110,0)
+  - WiFi mode: "WiFi" at top-right (98,0)
 
 **Mapping Logic:**
 ```c
@@ -245,9 +294,11 @@ Detected ports (as of 2026-01-17):
 - Second board: `/dev/cu.usbmodem21201`
 
 ### Key Commands
+
+**BLE Mode (Default):**
 ```bash
-make all                  # Compile + upload both boards
-make compile              # Compile only
+make all                  # Compile + upload both boards (BLE)
+make compile              # Compile only (BLE)
 make install-libs         # Install all libraries (includes ESP32Servo)
 make upload-transmitter   # Upload TX
 make upload-receiver      # Upload RX
@@ -256,6 +307,18 @@ make monitor-transmitter  # Serial monitor @ 115200
 make identify             # Blink LED to identify which board is which
 ```
 
+**WiFi Mode:**
+```bash
+make wifi-all                  # Compile + upload both boards (WiFi)
+make wifi-compile              # Compile only (WiFi)
+make wifi-compile-transmitter  # Compile TX only (WiFi)
+make wifi-compile-receiver     # Compile RX only (WiFi)
+make wifi-upload-transmitter   # Upload TX (WiFi)
+make wifi-upload-receiver      # Upload RX (WiFi)
+```
+
+**Note:** WiFi mode requires uncommenting `#define USE_WIFI` in both `.ino` files first.
+
 ---
 
 ## File Structure
@@ -263,17 +326,18 @@ make identify             # Blink LED to identify which board is which
 ```
 /Users/acid/Projects/esp32/comms+joystick/
 ├── transmitter/
-│   └── transmitter.ino       (270+ lines, TX with filtering)
+│   └── transmitter.ino       (370+ lines, TX with WiFi/BLE)
 ├── receiver/
-│   └── receiver.ino          (275+ lines, RX with servo)
-├── Makefile                  (Build automation with servo lib)
+│   └── receiver.ino          (420+ lines, RX with WiFi/BLE + servo)
+├── Makefile                  (Build automation with WiFi targets)
 ├── README.md                 (Main documentation)
 ├── QUICKSTART.md             (Quick start guide)
 ├── PIN_CONNECTIONS.txt       (Exact pin mappings)
 ├── WIRING.txt                (Detailed wiring diagrams)
 ├── HARDWARE_FILTERING.md     (Capacitor/RC filter guide)
 ├── SERVO_SETUP.md            (Servo wiring and configuration)
-└── AI_CATCHUP.md             (This file)
+├── WIFI_SETUP.md             (WiFi configuration and troubleshooting)
+└── CLAUDE.md                 (This file - AI catch-up guide)
 ```
 
 ---
@@ -418,6 +482,42 @@ Last commit: e8ca6e5 init
    - Added ESP32Servo to install-libs target
    - Added port display in upload targets
 
+### Session 2026-01-19
+
+10. **WiFi Communication Mode Implementation**
+   - Added compile-time switch between BLE and WiFi modes
+   - Implemented UDP communication on port 4210
+   - Added mDNS discovery (esp32-joystick-tx.local) with broadcast fallback
+   - Network configuration: SSID "amplifi", password "123qwe123"
+   - All existing functionality preserved (servo, display, filtering)
+
+11. **Conditional Compilation Structure**
+   - Added `#define USE_WIFI` switch at top of both files
+   - Wrapped BLE code in `#ifndef USE_WIFI`
+   - Wrapped WiFi code in `#ifdef USE_WIFI`
+   - Same data structure (12 bytes) for both modes
+   - Display status shows "WiFi" or "TX"/"RX" based on mode
+
+12. **Makefile WiFi Targets**
+   - Added `wifi-all` target for complete WiFi build
+   - Added `wifi-compile`, `wifi-compile-transmitter`, `wifi-compile-receiver`
+   - Added `wifi-upload-transmitter`, `wifi-upload-receiver`
+   - Used `compiler.cpp.extra_flags=-DUSE_WIFI` for proper compilation
+   - Updated help text to document WiFi targets
+
+13. **Comprehensive Documentation**
+   - Created `WIFI_SETUP.md` (complete WiFi guide)
+   - Updated `CLAUDE.md` with WiFi sections
+   - Added troubleshooting for WiFi-specific issues
+   - Documented switching between BLE and WiFi modes
+   - Added performance comparison table
+
+14. **Testing & Verification**
+   - BLE mode compiles: 717KB TX, 749KB RX (54-57% flash)
+   - WiFi mode compiles: 1041KB TX, 1023KB RX (78-79% flash)
+   - Both modes verified to compile without errors
+   - No changes required to pin assignments or hardware
+
 ---
 
 ## Next Steps / TODO
@@ -426,11 +526,15 @@ Last commit: e8ca6e5 init
 2. ✅ ~~Add software filtering~~ - DONE (oversampling + EMA)
 3. ✅ ~~Add servo control to receiver~~ - DONE (GPIO0, Joy1 X-axis)
 4. ✅ ~~Add visual representation~~ - DONE (circles + servo bar)
-5. Test full joystick range with filtering in all directions
-6. Verify servo responds smoothly to filtered joystick input
-7. Optional: Add hardware filtering (capacitors) if software filtering insufficient
-8. Optional: Add multiple servos on different GPIO pins
-9. Optional: Add servo smoothing/deadband on receiver side
+5. ✅ ~~Add WiFi communication mode~~ - DONE (UDP, mDNS, compile-time switch)
+6. Test full joystick range with filtering in all directions (both modes)
+7. Verify servo responds smoothly to filtered joystick input (both modes)
+8. Test WiFi mode with actual network (range, latency, reliability)
+9. Optional: Add hardware filtering (capacitors) if software filtering insufficient
+10. Optional: Add multiple servos on different GPIO pins
+11. Optional: Add servo smoothing/deadband on receiver side
+12. Optional: Add runtime mode switching (WiFi/BLE toggle)
+13. Optional: Add packet sequencing and timeout detection for WiFi mode
 
 ---
 
@@ -469,15 +573,38 @@ Last commit: e8ca6e5 init
 ### Problem: ESP32 resets when servo moves
 **Solution**: Use external 5V power supply for servo (insufficient current from USB)
 
+### Problem: WiFi connection failed
+**Solution**: Verify SSID/password in code, ensure 2.4GHz WiFi enabled, check signal strength, see `WIFI_SETUP.md`
+
+### Problem: Transmitter discovery failed (WiFi mode)
+**Solution**: Router may block mDNS, check "Client Isolation" disabled, receiver will auto-fallback to broadcast mode
+
+### Problem: No data received (WiFi mode)
+**Solution**: Verify both boards on same network, check Serial monitor for IP addresses, ensure firewall allows UDP port 4210
+
+### Problem: WiFi mode compilation fails
+**Solution**: Ensure using `make wifi-compile` (not manual arduino-cli with wrong flags), see Makefile for correct build property
+
 ---
 
 ## References
 
+### Hardware & ADC
 - [ESP32-C3 ADC Documentation](https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32c3/api-reference/peripherals/adc.html)
 - [ESP32 ADC Non-linear Issues](https://www.esp32.com/viewtopic.php?t=2881)
 - [HW-504 Joystick Specifications](https://components101.com/modules/joystick-module)
 - [Arduino ESP32 ADC Documentation](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/adc.html)
+
+### Libraries
 - [ESP32Servo Library](https://github.com/madhephaestus/ESP32Servo)
+- [Adafruit SSD1306 Library](https://github.com/adafruit/Adafruit_SSD1306)
+- [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library)
+
+### WiFi & Networking
+- [ESP32 WiFi Library Documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/wifi.html)
+- [ESP32 mDNS Documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/mdns.html)
+- [UDP Protocol Overview](https://en.wikipedia.org/wiki/User_Datagram_Protocol)
+- [mDNS Protocol Specification](https://en.wikipedia.org/wiki/Multicast_DNS)
 
 ---
 
@@ -490,6 +617,10 @@ Last commit: e8ca6e5 init
 5. **ADC non-linearity:** Known ESP32-C3 issue at 11dB attenuation with >3.3V input (RESOLVED)
 6. **Filtering is essential:** Software filtering implemented, hardware filtering optional
 7. **Servo control:** Currently Joy1 X-axis, easily configurable to other axes
+8. **Communication modes:** Two modes (BLE default, WiFi optional), compile-time switch via `#define USE_WIFI`
+9. **WiFi network:** Default "amplifi" / "123qwe123", easily changed in code
+10. **Build flags:** Use `compiler.cpp.extra_flags` not `build.extra_flags` for WiFi mode compilation
+11. **Mode switching:** No hardware changes needed, just recompile and upload
 
 ---
 

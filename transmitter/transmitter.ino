@@ -1,10 +1,23 @@
+// ========================================
+// COMPILE-TIME COMMUNICATION MODE SWITCH
+// ========================================
+// Uncomment the line below to use WiFi instead of BLE
+#define USE_WIFI
+
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+
+#ifdef USE_WIFI
+  #include <WiFi.h>
+  #include <WiFiUdp.h>
+  #include <ESPmDNS.h>
+#else
+  #include <BLEDevice.h>
+  #include <BLEServer.h>
+  #include <BLEUtils.h>
+  #include <BLE2902.h>
+#endif
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
@@ -32,15 +45,36 @@
 #define JOY2_CENTER_X 3352
 #define JOY2_CENTER_Y 3510
 
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+// ========================================
+// COMMUNICATION CONFIGURATION
+// ========================================
+#ifdef USE_WIFI
+  // WiFi Configuration
+  #define WIFI_SSID "amplifi"
+  #define WIFI_PASSWORD "123qwe123"
+  #define UDP_PORT 4210
+  #define MDNS_HOSTNAME "esp32-joystick-tx"
+#else
+  // BLE Configuration
+  #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+  #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#endif
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-BLEServer* pServer = NULL;
-BLECharacteristic* pCharacteristic = NULL;
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
+// ========================================
+// COMMUNICATION GLOBALS
+// ========================================
+#ifdef USE_WIFI
+  WiFiUDP udp;
+  IPAddress broadcastIP(255, 255, 255, 255); // Broadcast address
+  volatile bool wifiConnected = false;
+#else
+  BLEServer* pServer = NULL;
+  BLECharacteristic* pCharacteristic = NULL;
+  bool deviceConnected = false;
+  bool oldDeviceConnected = false;
+#endif
 
 struct JoystickData {
   int16_t joy1_x;
@@ -75,6 +109,10 @@ int readADC(int pin) {
   return sum / ADC_SAMPLES;
 }
 
+// ========================================
+// COMMUNICATION CALLBACKS
+// ========================================
+#ifndef USE_WIFI
 class MyServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
@@ -84,6 +122,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
     deviceConnected = false;
   }
 };
+#endif
 
 String getDirection(int x, int y, int centerX, int centerY) {
   int threshold = 1500;
@@ -154,13 +193,60 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH); // Start with LED OFF
+
+  #ifdef USE_WIFI
+    // WiFi MUST be initialized FIRST, before any other hardware
+    Serial.println("Starting WiFi Transmitter...");
+    Serial.print("Connecting to WiFi: ");
+    Serial.println(WIFI_SSID);
+
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.print("Connecting to WiFi");
+
+    int connect_timeout = 40; // 40 * 500ms = 20 seconds
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+      connect_timeout--;
+      if (connect_timeout <= 0) {
+        Serial.println("\n\nFailed to connect to WiFi! Halting.");
+        Serial.println("Please check SSID and password.");
+        // Infinite error blink
+        while(true) {
+          digitalWrite(LED_PIN, LOW);
+          delay(150);
+          digitalWrite(LED_PIN, HIGH);
+          delay(150);
+        }
+      }
+    }
+
+    wifiConnected = true;
+    Serial.println("\nConnected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+
+    // Start mDNS responder
+    if (MDNS.begin(MDNS_HOSTNAME)) {
+      Serial.print("mDNS responder started: ");
+      Serial.print(MDNS_HOSTNAME);
+      Serial.println(".local");
+    } else {
+      Serial.println("Error setting up mDNS responder!");
+    }
+
+    // Start UDP
+    udp.begin(UDP_PORT);
+    Serial.print("Ready to send UDP packets on port ");
+    Serial.println(UDP_PORT);
+  #endif
+
+  // Now initialize other hardware
   pinMode(JOY1_SW, INPUT_PULLUP);
   pinMode(JOY2_SW, INPUT_PULLUP);
 
   // Configure ADC attenuation for better linearity
-  // ADC_11db allows reading up to ~3.3V (default, but non-linear)
-  // If joysticks are powered by 5V, they will clip at 3.3V
-  // SOLUTION: Power joysticks from 3.3V instead of 5V
   analogReadResolution(12); // 12-bit resolution (0-4095)
   analogSetAttenuation(ADC_11db); // 0-3.3V range
 
@@ -171,8 +257,7 @@ void setup() {
     for(;;);
   }
 
-  // Set display brightness/contrast (0-255, default is 127)
-  // Higher = brighter. 255 = maximum brightness
+  // Set display brightness/contrast
   display.ssd1306_command(0x81); // Set contrast control
   display.ssd1306_command(0xFF); // Maximum brightness (255)
 
@@ -184,35 +269,45 @@ void setup() {
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
-  display.println(F("TX: Initializing"));
-  display.display();
-  delay(1000);
 
-  BLEDevice::init("ESP32_Joystick_TX");
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+  #ifdef USE_WIFI
+    display.println(F("TX: WiFi OK"));
+    display.setCursor(0, 10);
+    display.print(F("IP: "));
+    display.println(WiFi.localIP());
+    display.display();
+    delay(2000);
+  #else
+    display.println(F("TX: BLE Mode"));
+    display.display();
+    delay(1000);
 
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+    BLEDevice::init("ESP32_Joystick_TX");
+    pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
 
-  pCharacteristic = pService->createCharacteristic(
-    CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_READ   |
-    BLECharacteristic::PROPERTY_WRITE  |
-    BLECharacteristic::PROPERTY_NOTIFY |
-    BLECharacteristic::PROPERTY_INDICATE
-  );
+    BLEService *pService = pServer->createService(SERVICE_UUID);
 
-  pCharacteristic->addDescriptor(new BLE2902());
+    pCharacteristic = pService->createCharacteristic(
+      CHARACTERISTIC_UUID,
+      BLECharacteristic::PROPERTY_READ   |
+      BLECharacteristic::PROPERTY_WRITE  |
+      BLECharacteristic::PROPERTY_NOTIFY |
+      BLECharacteristic::PROPERTY_INDICATE
+    );
 
-  pService->start();
+    pCharacteristic->addDescriptor(new BLE2902());
 
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);
-  BLEDevice::startAdvertising();
+    pService->start();
 
-  Serial.println("BLE Server Started. Waiting for connection...");
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(false);
+    pAdvertising->setMinPreferred(0x0);
+    BLEDevice::startAdvertising();
+
+    Serial.println("BLE Server Started. Waiting for connection...");
+  #endif
 }
 
 void loop() {
@@ -277,12 +372,21 @@ void loop() {
 
     // Draw status indicator
     display.setTextSize(1);
-    display.setCursor(110, 0);
-    if (deviceConnected) {
-      display.print(F("TX"));
-    } else {
-      display.print(F("--"));
-    }
+    #ifdef USE_WIFI
+      display.setCursor(98, 0);
+      if (wifiConnected) {
+        display.print(F("WiFi"));
+      } else {
+        display.print(F("----"));
+      }
+    #else
+      display.setCursor(110, 0);
+      if (deviceConnected) {
+        display.print(F("TX"));
+      } else {
+        display.print(F("--"));
+      }
+    #endif
 
     // Draw bottom info bar with raw values
     display.setCursor(0, 25);
@@ -293,14 +397,26 @@ void loop() {
 
     display.display();
 
-    if (deviceConnected) {
-      pCharacteristic->setValue((uint8_t*)&joystickData, sizeof(joystickData));
-      pCharacteristic->notify();
-    }
+    // Send data via WiFi or BLE
+    #ifdef USE_WIFI
+      if (wifiConnected) {
+        // Send UDP packet to broadcast address
+        udp.beginPacket(broadcastIP, UDP_PORT);
+        udp.write((uint8_t*)&joystickData, sizeof(joystickData));
+        udp.endPacket();
+      }
+    #else
+      if (deviceConnected) {
+        pCharacteristic->setValue((uint8_t*)&joystickData, sizeof(joystickData));
+        pCharacteristic->notify();
+      }
+    #endif
 
     lastUpdate = millis();
   }
 
+  #ifndef USE_WIFI
+  // BLE connection management
   if (!deviceConnected && oldDeviceConnected) {
     delay(500);
     pServer->startAdvertising();
@@ -312,4 +428,5 @@ void loop() {
     oldDeviceConnected = deviceConnected;
     Serial.println("Device connected");
   }
+  #endif
 }
