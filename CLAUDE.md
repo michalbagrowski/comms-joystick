@@ -1,23 +1,29 @@
 # AI Catch-Up Guide - ESP32 Dual Joystick BLE/WiFi Project
 
-**Last Updated:** 2026-01-19
-**Status:** WiFi mode added, compile-time switching implemented, dual communication modes supported
+**Last Updated:** 2026-01-21
+**Status:** Display drivers corrected, joystick calibration updated, USB CDC enabled
 
 ---
 
 ## Quick Project Summary
 
-Wireless dual-joystick controller with **two communication modes** between ESP32-C3 boards:
+Wireless dual-joystick controller with **DC motors** and **two communication modes** between ESP32-C3 boards:
 
 ### BLE Mode (Default)
-- **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via BLE at 10Hz
-- **Receiver (RX)**: Receives BLE data, displays joystick positions + controls servo motor
+- **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via BLE at 10Hz, displays "fake motor speeds"
+- **Receiver (RX)**: Receives BLE data, displays joystick positions + controls 2x DC motors via MX1508 driver
 
 ### WiFi Mode (Optional)
-- **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via UDP/WiFi at 10Hz
-- **Receiver (RX)**: Receives UDP packets, displays joystick positions + controls servo motor
+- **Transmitter (TX)**: Reads 2x HW-504 analog joysticks, broadcasts via UDP/WiFi at 10Hz, displays "fake motor speeds"
+- **Receiver (RX)**: Receives UDP packets, displays joystick positions + controls 2x DC motors via MX1508 driver
 - **Network**: Connects to "amplifi" WiFi network
 - **Discovery**: Automatic via mDNS (esp32-joystick-tx.local)
+
+**Key Features:**
+- **Joy1** controls servo: Joy1 X-axis → Servo angle (0-180°)
+- **Joy2** controls DC motors:
+  - Joy2 X-axis → Motor 1 (left/right movement)
+  - Joy2 Y-axis → Motor 2 (forward/backward movement)
 
 ---
 
@@ -28,40 +34,55 @@ Wireless dual-joystick controller with **two communication modes** between ESP32
 - **Joysticks**: 2x HW-504 modules (analog XY + digital button)
   - J1: GPIO0 (VRx), GPIO1 (VRy), GPIO2 (SW)
   - J2: GPIO3 (VRx), GPIO4 (VRy), GPIO5 (SW)
-- **Display**: SSD1306 OLED 0.91" 128x32 I2C @ 0x3C
+- **Display**: 1.9" OLED 128x64 I2C (SH1106) @ 0x3C
   - GPIO6 (SDA), GPIO7 (SCL)
-- **LED**: GPIO8 (built-in, blinks 500ms)
+  - Library: Adafruit_SH110X
+  - Shows joystick positions + "fake motor speeds" (calculated from Joy2)
+- **LED**: GPIO8 (built-in, blinks every 1 second)
 
 ### Receiver Board
 - **Board**: ESP32-C3 Super Mini
-- **Display**: SSD1306 OLED 0.91" 128x32 I2C @ 0x3C
+- **Display**: 1.3" OLED 128x64 I2C (SSD1306) @ 0x3C
   - GPIO6 (SDA), GPIO7 (SCL)
-- **Servo**: SG90 mini servo on GPIO0
-  - Controls based on Joystick 1 X-axis
-  - Range: 0° to 180°
+  - Library: Adafruit_SSD1306
+  - Shows joystick positions + servo angle + motor speeds (as bars)
+- **LED**: GPIO8 (built-in, blinks every 3 seconds)
+- **Servo**: SG90 mini servo on GPIO4
+  - Controls based on Joystick 1 X-axis (0-4095 → 0-180°)
+  - Independent angular control (e.g., steering, camera pan)
+- **Motor Driver**: MX1508 dual H-bridge
+  - Motor 1 (Joy2 X-axis): GPIO0 (IN1), GPIO1 (IN2)
+  - Motor 2 (Joy2 Y-axis): GPIO2 (IN3), GPIO3 (IN4)
+  - PWM: 20kHz, 8-bit resolution (0-255)
+  - **Motor Enable**: GPIO5 controls 2N2222 transistor (prevents boot twitch)
+- **Motors**: 2x DC motors (3.7V rated)
+- **LED**: GPIO8 (built-in, status indicator)
 
 ### Power Configuration
-- **OLED**: 3.3V only (will damage at 5V)
+- **OLED Displays**: 3.3V only (will damage at 5V)
 - **Joysticks**: 3.3V (changed from 5V - RESOLVED)
-- **Servo**: 5V from ESP32 or external supply
+- **Servo**: 5V (SG90 draws 100-500mA depending on load)
+- **MX1508 Driver**: 5V (powers motors)
+- **DC Motors**: 3.7V nominal (powered through MX1508 from 5V)
 - **ESP32-C3 ADC**: 0-3.3V max, 12-bit (0-4095)
+- **Recommended Power**: 5V 3A wall adapter for receiver (servo + motors draw significant current)
 
 ---
 
 ## Measured Joystick Calibration Values
 
-**At rest (neutral position), measured 2026-01-17:**
+**At rest (neutral position), measured 2026-01-21:**
 
 | Joystick | X Center | Y Center |
 |----------|----------|----------|
-| J1       | 3515     | 3234     |
-| J2       | 3352     | 3510     |
+| J1       | 2235     | 2217     |
+| J2       | 2215     | 2255     |
 
 These values are **device-specific** and stored in code as:
 - `JOY1_CENTER_X`, `JOY1_CENTER_Y`
 - `JOY2_CENTER_X`, `JOY2_CENTER_Y`
 
-**Previous assumption:** Center was 3200,3200 (incorrect)
+**Note:** Previous values (~3500) were incorrect. Actual centers are ~2220.
 
 ---
 
@@ -197,7 +218,7 @@ struct JoystickData {
 
 **User Request:** Zero state (neutral joystick position) should appear at **bottom-right corner** of circle.
 
-### Transmitter Display (128x32 pixels)
+### Transmitter Display (128x64 pixels - upgraded from 128x32)
 ```
 ┌──────────────────────────────────────────────────┐
 │ J1    ○       J2    ○               TX          │  ← Top: Circles + status
@@ -215,7 +236,7 @@ struct JoystickData {
   - WiFi mode: "WiFi" or "----" at top-right (98,0)
 - **Raw values**: Bottom shows X values for both joysticks
 
-### Receiver Display (128x32 pixels)
+### Receiver Display (128x64 pixels - upgraded from 128x32)
 ```
 ┌──────────────────────────────────────────────────┐
 │ J1  ○     J2  ○                     RX          │  ← Top: Circles + status
@@ -251,32 +272,79 @@ int dotY = zeroY + mapY;
 
 ---
 
-## Servo Control
+## Servo and Motor Control
+
+### Servo Control (Joy1 X-axis)
 
 **Configuration:**
-- **Pin**: GPIO0 (receiver)
+- **Model**: SG90 mini servo (or compatible)
+- **Pin**: GPIO4 (receiver)
 - **Control Source**: Joystick 1 X-axis
 - **Mapping**: Linear 0-4095 → 0-180°
 - **Library**: ESP32Servo
+- **Use Cases**: Steering, camera pan, angular positioning
 
 **Code (receiver.ino):**
 ```c
-int servoAngle = map(joystickData.joy1_x, 0, 4095, 0, 180);
-servoAngle = constrain(servoAngle, 0, 180);
-myServo.write(servoAngle);
+servo_angle = map(joystickData.joy1_x, 0, 4095, 0, 180);
+servo_angle = constrain(servo_angle, 0, 180);
+myServo.write(servo_angle);
 ```
 
-**To change control source:** Edit receiver.ino ~line 247
-- Joy1 Y-axis: `joystickData.joy1_y`
-- Joy2 X-axis: `joystickData.joy2_x`
-- Joy2 Y-axis: `joystickData.joy2_y`
+**Power:**
+- 100-500mA depending on load
+- Can use ESP32 5V pin for light loads
+- For heavy loads, use external 5V supply
+
+### DC Motor Control (Joy2 X/Y axes)
+
+**Configuration:**
+- **Motor Driver**: MX1508 dual H-bridge
+- **Pins**: GPIO0-3 (receiver)
+  - Motor 1: GPIO0 (IN1 forward), GPIO1 (IN2 reverse)
+  - Motor 2: GPIO2 (IN3 forward), GPIO3 (IN4 reverse)
+- **Control Source**: Joystick 2 (Joy2) controls both motors
+  - Joy2 X-axis → Motor 1 (left/right)
+  - Joy2 Y-axis → Motor 2 (forward/backward)
+- **PWM**: ESP32 LEDC (built-in), 20kHz, 8-bit (0-255)
+- **Deadzone**: ±200 ADC counts around center (prevents jitter)
+
+**Code (receiver.ino):**
+```c
+void controlMotors(int16_t joy2_x, int16_t joy2_y) {
+  // Motor 1 from Joy2 X-axis
+  int motor1_speed = map(joy2_x, 0, 4095, -255, 255);
+  // Motor 2 from Joy2 Y-axis
+  int motor2_speed = map(joy2_y, 0, 4095, -255, 255);
+
+  // Bidirectional PWM control
+  if (motor1_speed > 0) {
+    ledcWrite(0, motor1_speed);  // Forward
+    ledcWrite(1, 0);
+  } else if (motor1_speed < 0) {
+    ledcWrite(0, 0);
+    ledcWrite(1, -motor1_speed); // Reverse
+  } else {
+    ledcWrite(0, 0); ledcWrite(1, 0);  // Stop
+  }
+  // Same for motor 2...
+}
+```
 
 **Wiring:**
-- Brown (GND) → ESP32 GND
-- Red (VCC) → ESP32 5V (or external 5V supply for heavy loads)
-- Orange/Yellow (Signal) → ESP32 GPIO0
+- Servo: Brown/Black (GND) → ESP32 GND, Red (VCC) → ESP32 5V, Orange/Yellow (Signal) → GPIO4
+- MX1508 VCC → ESP32 5V
+- MX1508 GND → ESP32 GND
+- MX1508 IN1 → GPIO0, IN2 → GPIO1, IN3 → GPIO2, IN4 → GPIO3
+- Motors connected to MX1508 OUT1-OUT2 and OUT3-OUT4
 
-**See:** `SERVO_SETUP.md` for complete wiring and configuration guide
+**Power Considerations:**
+- Servo draws 100-500mA depending on load
+- Motors can draw 1-2A each under load
+- Use 5V 3A wall adapter (USB computer port insufficient)
+- Add 1000µF capacitor across power for stability
+
+**See:** `WIRING.md` for complete wiring guide (TX and RX sections)
 
 ---
 
@@ -289,9 +357,16 @@ TX_PORT = $(shell arduino-cli board list | grep "Serial Port (USB)" | head -n1 |
 RX_PORT = $(shell arduino-cli board list | grep "Serial Port (USB)" | tail -n1 | awk '{print $1}')
 ```
 
-Detected ports (as of 2026-01-17):
-- First board: `/dev/cu.usbmodem21101`
-- Second board: `/dev/cu.usbmodem21201`
+Detected ports (as of 2026-01-21):
+- First board: `/dev/cu.usbmodem21101` (TX)
+- Second board: `/dev/cu.usbmodem21201` (RX)
+
+### USB CDC On Boot (CRITICAL)
+ESP32-C3 requires `CDCOnBoot=cdc` flag for Serial output to work over USB:
+```makefile
+BOARD_FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc
+```
+Without this, Serial.println() output will NOT appear in the serial monitor.
 
 ### Key Commands
 
@@ -326,19 +401,20 @@ make wifi-upload-receiver      # Upload RX (WiFi)
 ```
 /Users/acid/Projects/esp32/comms+joystick/
 ├── transmitter/
-│   └── transmitter.ino       (370+ lines, TX with WiFi/BLE)
+│   └── transmitter.ino       (500+ lines, TX with WiFi/BLE + motor speed viz)
 ├── receiver/
-│   └── receiver.ino          (420+ lines, RX with WiFi/BLE + servo)
+│   └── receiver.ino          (580+ lines, RX with WiFi/BLE + DC motors)
 ├── Makefile                  (Build automation with WiFi targets)
 ├── README.md                 (Main documentation)
 ├── QUICKSTART.md             (Quick start guide)
+├── WIRING.md                 (★ COMPLETE wiring guide - TX & RX sections)
 ├── PIN_CONNECTIONS.txt       (Exact pin mappings)
-├── WIRING.txt                (Detailed wiring diagrams)
 ├── HARDWARE_FILTERING.md     (Capacitor/RC filter guide)
-├── SERVO_SETUP.md            (Servo wiring and configuration)
 ├── WIFI_SETUP.md             (WiFi configuration and troubleshooting)
 └── CLAUDE.md                 (This file - AI catch-up guide)
 ```
+
+**Note:** `WIRING.md` is the comprehensive wiring guide with clear TX and RX sections, step-by-step instructions, troubleshooting, and BOM.
 
 ---
 
@@ -406,9 +482,10 @@ uint8_t button = digitalRead(JOY_SW);
 ### I2C Configuration
 - **Custom pins**: GPIO6 (SDA), GPIO7 (SCL) - NOT default ESP32 I2C pins
 - **OLED address**: 0x3C
-- **Display resolution**: 128x32 pixels
+- **Display resolution**: 128x64 pixels (upgraded from 128x32)
 - **Brightness**: Set to maximum (255) on both displays
 - **Refresh rate**: ~100ms (synced with sensor read)
+- **Note**: Display pin labels vary - SCX = SCL = SCK (all mean I2C Clock)
 
 ---
 
@@ -518,23 +595,123 @@ Last commit: e8ca6e5 init
    - Both modes verified to compile without errors
    - No changes required to pin assignments or hardware
 
+### Session 2026-01-20
+
+15. **Display Upgrade to 128x64**
+   - Transmitter: Upgraded from 0.91" 128x32 to 1.9" 128x64 OLED (SSD1306 compatible)
+   - Receiver: Upgraded from 0.91" 128x32 to 1.3" 128x64 OLED (SH1106)
+   - Changed `SCREEN_HEIGHT` from 32 to 64 in both files
+   - Enlarged joystick circles: radius 10→14, repositioned for better visibility
+   - Updated display library for receiver: Adafruit_SSD1306 → Adafruit_SH110X
+   - Updated color constants: SSD1306_WHITE → SH110X_WHITE (receiver only)
+
+16. **DC Motor Control Implementation (Replaced Servo)**
+   - Removed servo control completely from receiver
+   - Added MX1508 dual H-bridge motor driver support
+   - Motor 1 (Joy2 X-axis): GPIO0 (IN1), GPIO1 (IN2)
+   - Motor 2 (Joy2 Y-axis): GPIO2 (IN3), GPIO3 (IN4)
+   - Implemented bidirectional PWM control (forward/reverse)
+   - PWM configuration: 20kHz frequency, 8-bit resolution (0-255)
+   - Added motor deadzone (±200 ADC counts) to prevent jitter at center
+   - Used ESP32 LEDC (built-in PWM), no external motor library needed
+
+17. **Motor Speed Visualization**
+   - Transmitter: Added "fake motor speed" calculation and display based on Joy2 values
+   - Both displays now show motor speeds as bidirectional horizontal bars
+   - M1 bar (y=48-55): Shows Motor 1 speed, center at x=64, arrows show direction
+   - M2 bar (y=56-63): Shows Motor 2 speed, center at x=64, arrows show direction
+   - Transmitter shows calculated speeds, receiver shows actual PWM values
+   - Visual feedback allows user to see motor control response in real-time
+
+18. **Library Dependencies Update**
+   - Added `Adafruit SH110X` library to Makefile install-libs target
+   - Removed ESP32Servo dependency (no longer needed)
+   - Noted that ESP32 LEDC (built-in PWM) requires no external libraries
+
+19. **Comprehensive Wiring Documentation**
+   - Consolidated wiring files into single `WIRING.md` with clear TX/RX sections
+   - Documented MX1508 motor driver connection details
+   - Added power distribution requirements (5V 2A+ recommended for receiver)
+   - Included troubleshooting guide for motor issues
+   - Added Bill of Materials (BOM) with all components
+   - Documented pin assignments for both boards
+   - Added testing procedure for motors and displays
+
+20. **Code Architecture Improvements**
+   - Receiver: Added `controlMotors()` function for clean motor control
+   - Receiver: Added `drawMotorBars()` function for motor speed visualization
+   - Transmitter: Added `drawFakeMotorSpeeds()` function to show expected motor behavior
+   - Maintained same 100ms update rate for smooth operation
+   - Both communication modes (BLE/WiFi) fully compatible with motor control
+
+21. **Servo Restored (User Request)**
+   - User requested servo back alongside motors (not replacement)
+   - Servo added on GPIO4 (receiver)
+   - Joy1 X-axis controls servo (0-4095 → 0-180°)
+   - Joy2 X/Y axes control motors (independent control)
+   - Added `drawServoBar()` function to both TX and RX displays
+   - Transmitter shows "fake" servo angle based on Joy1 X-axis
+   - Receiver shows actual servo position + motor speeds
+   - Display layout: Joystick circles (top) → Servo bar (middle) → Motor bars (bottom)
+   - Updated WIRING.md with servo wiring steps
+   - Power budget updated: 5V 3A recommended (servo + motors)
+
+### Session 2026-01-21
+
+22. **USB CDC On Boot Fix**
+   - Serial output was not appearing over USB
+   - Root cause: ESP32-C3 requires `CDCOnBoot=cdc` board option
+   - Updated Makefile: `BOARD_FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc`
+   - Serial.println() now works correctly
+
+23. **Display Driver Correction**
+   - TX display was showing artifacts with SSD1306 driver
+   - RX display was not working with SH1106 driver
+   - **Corrected configuration:**
+     - TX display: Uses **SH1106** driver (Adafruit_SH110X)
+     - RX display: Uses **SSD1306** driver (Adafruit_SSD1306)
+   - Both displays now work correctly
+
+24. **Joystick Calibration Update**
+   - Display visualization was incorrect (axes appearing on wrong circles)
+   - Created joystick diagnostic tool to measure actual GPIO values
+   - **Old center values:** ~3500 (incorrect)
+   - **New center values:** ~2220 (correct)
+   - Updated both TX and RX code with correct values:
+     - JOY1_CENTER_X: 2235, JOY1_CENTER_Y: 2217
+     - JOY2_CENTER_X: 2215, JOY2_CENTER_Y: 2255
+
+25. **LED Blink Rates Configured**
+   - TX: Blinks every 1 second
+   - RX: Blinks every 3 seconds
+   - Allows visual identification of which board is which
+
+26. **WiFi Mode Disabled by Default**
+   - Commented out `#define USE_WIFI` in both files
+   - BLE mode now default (doesn't require WiFi network)
+
 ---
 
 ## Next Steps / TODO
 
 1. ✅ ~~Test with joysticks powered by 3.3V~~ - DONE
 2. ✅ ~~Add software filtering~~ - DONE (oversampling + EMA)
-3. ✅ ~~Add servo control to receiver~~ - DONE (GPIO0, Joy1 X-axis)
-4. ✅ ~~Add visual representation~~ - DONE (circles + servo bar)
+3. ✅ ~~Add servo control to receiver~~ - REPLACED with DC motors
+4. ✅ ~~Add visual representation~~ - DONE (circles + motor bars on 128x64 displays)
 5. ✅ ~~Add WiFi communication mode~~ - DONE (UDP, mDNS, compile-time switch)
-6. Test full joystick range with filtering in all directions (both modes)
-7. Verify servo responds smoothly to filtered joystick input (both modes)
-8. Test WiFi mode with actual network (range, latency, reliability)
-9. Optional: Add hardware filtering (capacitors) if software filtering insufficient
-10. Optional: Add multiple servos on different GPIO pins
-11. Optional: Add servo smoothing/deadband on receiver side
-12. Optional: Add runtime mode switching (WiFi/BLE toggle)
-13. Optional: Add packet sequencing and timeout detection for WiFi mode
+6. ✅ ~~Upgrade displays to 128x64~~ - DONE (1.9" TX, 1.3" SH1106 RX)
+7. ✅ ~~Add DC motor control~~ - DONE (MX1508, Joy2 controls both motors)
+8. Test full joystick range with filtering in all directions (both modes)
+9. Test motor response with different joystick positions (both motors, both directions)
+10. Test WiFi mode with actual network (range, latency, reliability)
+11. Verify motor speed bars on TX match actual motor speeds on RX
+12. Test power requirements (motors may need external 5V 2A+ supply)
+13. Optional: Add hardware filtering (capacitors) if software filtering insufficient
+14. Optional: Add motor ramping/acceleration curves for smoother control
+15. Optional: Add motor current sensing for overload detection
+16. Optional: Add runtime mode switching (WiFi/BLE toggle)
+17. Optional: Add packet sequencing and timeout detection for WiFi mode
+18. Optional: Add actual speed measurements (RPM) using encoders (future enhancement)
 
 ---
 
@@ -561,17 +738,26 @@ Last commit: e8ca6e5 init
 ### Problem: Non-linear joystick response
 **Solution**: Verify 3.3V power, check ADC attenuation setting, software filtering enabled (RESOLVED)
 
-### Problem: Servo jitters or doesn't move smoothly
-**Solution**: Check wiring, verify power (5V), add capacitor filtering, check BLE connection stable
+### Problem: Motors don't spin
+**Solution**: Check MX1508 power (5V), verify GPIO0-3 connections, check motor wiring to OUT1-4, test TX Joy2 joystick
+
+### Problem: Motors spin weakly
+**Solution**: Insufficient power - use 5V 2A+ adapter, add 1000µF capacitor, check motor voltage rating
 
 ### Problem: Receiver display dimmer than transmitter
 **Solution**: Brightness now set to max (255), check 3.3V voltage at OLED, verify wiring quality
 
-### Problem: Servo doesn't move
-**Solution**: Check signal wire to GPIO0, verify 5V power, see `SERVO_SETUP.md`
+### Problem: Motor spins wrong direction
+**Solution**: Swap motor wires at MX1508 output terminals (no code changes needed), see `WIRING.md`
 
-### Problem: ESP32 resets when servo moves
-**Solution**: Use external 5V power supply for servo (insufficient current from USB)
+### Problem: ESP32 resets when motors run
+**Solution**: Motor current too high for USB - use external 5V 2A+ power supply, add 1000µF capacitor
+
+### Problem: Motors jitter at center position
+**Solution**: Increase `MOTOR_DEADZONE` in code (currently 200), add power filtering, check joystick calibration
+
+### Problem: Motors twitch on boot/reset
+**Solution**: Add motor enable circuit using 2N2222 transistor on GPIO5. This cuts MX1508 ground connection until code explicitly enables it. Pull-down resistors alone don't work because bootloader can drive GPIO pins. See `WIRING.md` Step 4 for circuit diagram.
 
 ### Problem: WiFi connection failed
 **Solution**: Verify SSID/password in code, ensure 2.4GHz WiFi enabled, check signal strength, see `WIFI_SETUP.md`

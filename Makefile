@@ -1,7 +1,7 @@
 .PHONY: all install-cli install-core install-libs compile-transmitter compile-receiver compile upload-transmitter upload-receiver clean monitor-transmitter monitor-receiver help wifi-compile-transmitter wifi-compile-receiver wifi-compile wifi-upload-transmitter wifi-upload-receiver wifi-all
 
 ARDUINO_CLI = arduino-cli
-BOARD_FQBN = esp32:esp32:esp32c3
+BOARD_FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc
 BOARD_NAME = esp32:esp32
 
 TX_SKETCH = transmitter/transmitter.ino
@@ -70,7 +70,9 @@ install-libs:
 	@echo "Installing required libraries..."
 	$(ARDUINO_CLI) lib install "Adafruit GFX Library"
 	$(ARDUINO_CLI) lib install "Adafruit SSD1306"
+	$(ARDUINO_CLI) lib install "Adafruit SH110X"
 	$(ARDUINO_CLI) lib install "ESP32Servo"
+	@echo "Note: ESP32 has built-in PWM support (LEDC) for motors"
 	@echo "Libraries installed successfully!"
 
 compile: compile-transmitter compile-receiver

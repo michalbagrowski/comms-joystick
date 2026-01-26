@@ -2,7 +2,7 @@
 // COMPILE-TIME COMMUNICATION MODE SWITCH
 // ========================================
 // Uncomment the line below to use WiFi instead of BLE
-#define USE_WIFI
+// #define USE_WIFI  // Comment out to use BLE mode
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -21,22 +21,40 @@
 #endif
 
 #define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
+#define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
 
 #define SDA_PIN 6
 #define SCL_PIN 7
-#define SERVO_PIN 0  // GPIO0 for servo control
+
+// Servo control pin
+#define SERVO_PIN 4  // Servo controlled by Joy1 X-axis
+
+// Motor control pins (MX1508 driver)
+#define MOTOR1_IN1 0  // Motor 1 forward (Joy2 X-axis)
+#define MOTOR1_IN2 1  // Motor 1 reverse
+#define MOTOR2_IN3 2  // Motor 2 forward (Joy2 Y-axis)
+#define MOTOR2_IN4 3  // Motor 2 reverse
+
 #define LED_PIN 8    // Built-in LED for error indication
 
+// Motor enable pin - controls power to MX1508 via transistor
+// This prevents motor twitch during boot (MX1508 has no power until code enables it)
+#define MOTOR_ENABLE_PIN 5
+
+// Motor control constants
+#define MOTOR_DEADZONE 200   // Deadzone around center to prevent motor jitter
+#define MOTOR_PWM_FREQ 20000 // 20kHz PWM frequency for motors
+#define MOTOR_PWM_RES 8      // 8-bit resolution (0-255)
+
 // Joystick 1 center values (measured at rest)
-#define JOY1_CENTER_X 3515
-#define JOY1_CENTER_Y 3234
+#define JOY1_CENTER_X 2235
+#define JOY1_CENTER_Y 2217
 
 // Joystick 2 center values (measured at rest)
-#define JOY2_CENTER_X 3352
-#define JOY2_CENTER_Y 3510
+#define JOY2_CENTER_X 2215
+#define JOY2_CENTER_Y 2255
 
 // ========================================
 // COMMUNICATION CONFIGURATION
@@ -56,6 +74,11 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 Servo myServo;  // Create servo object
+
+// Motor speed variables (global to track current speeds)
+int motor1_speed = 0;
+int motor2_speed = 0;
+int servo_angle = 90;  // Current servo angle
 
 // ========================================
 // COMMUNICATION GLOBALS
@@ -81,7 +104,14 @@ struct JoystickData {
   int16_t joy2_x;
   int16_t joy2_y;
   uint8_t joy2_sw;
-} joystickData;
+} joystickData = {
+  JOY1_CENTER_X, JOY1_CENTER_Y, HIGH,  // Initialize to center (motors stop)
+  JOY2_CENTER_X, JOY2_CENTER_Y, HIGH
+};
+
+// Flag to prevent motor/servo activation until valid data received
+volatile bool outputsEnabled = false;  // volatile for BLE callback safety
+bool servoAttached = false;
 
 String getDirection(int x, int y, int centerX, int centerY) {
   int threshold = 1500;
@@ -148,6 +178,115 @@ void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int c
   display.print(label);
 }
 
+// Motor control function
+void controlMotors(int16_t joy2_x, int16_t joy2_y) {
+  // Calculate motor 1 speed from Joy2 X-axis (left/right)
+  int joy2x_offset = joy2_x - JOY2_CENTER_X;
+  if (abs(joy2x_offset) < MOTOR_DEADZONE) {
+    motor1_speed = 0;
+  } else {
+    motor1_speed = map(joy2_x, 0, 4095, -255, 255);
+    motor1_speed = constrain(motor1_speed, -255, 255);
+  }
+
+  // Calculate motor 2 speed from Joy2 Y-axis (forward/backward)
+  int joy2y_offset = joy2_y - JOY2_CENTER_Y;
+  if (abs(joy2y_offset) < MOTOR_DEADZONE) {
+    motor2_speed = 0;
+  } else {
+    motor2_speed = map(joy2_y, 0, 4095, -255, 255);
+    motor2_speed = constrain(motor2_speed, -255, 255);
+  }
+
+  // Control Motor 1 (MX1508 bidirectional PWM)
+  // New API: ledcWrite(pin, dutyCycle) - write directly to pin
+  if (motor1_speed > 0) {
+    ledcWrite(MOTOR1_IN1, motor1_speed);  // Forward
+    ledcWrite(MOTOR1_IN2, 0);
+  } else if (motor1_speed < 0) {
+    ledcWrite(MOTOR1_IN1, 0);
+    ledcWrite(MOTOR1_IN2, -motor1_speed); // Reverse
+  } else {
+    ledcWrite(MOTOR1_IN1, 0);
+    ledcWrite(MOTOR1_IN2, 0);
+  }
+
+  // Control Motor 2 (MX1508 bidirectional PWM)
+  if (motor2_speed > 0) {
+    ledcWrite(MOTOR2_IN3, motor2_speed);  // Forward
+    ledcWrite(MOTOR2_IN4, 0);
+  } else if (motor2_speed < 0) {
+    ledcWrite(MOTOR2_IN3, 0);
+    ledcWrite(MOTOR2_IN4, -motor2_speed); // Reverse
+  } else {
+    ledcWrite(MOTOR2_IN3, 0);
+    ledcWrite(MOTOR2_IN4, 0);
+  }
+}
+
+// Draw servo position bar
+void drawServoBar() {
+  // Servo angle text
+  display.setCursor(0, 32);
+  display.setTextSize(1);
+  display.print("S:");
+  display.print(servo_angle);
+  display.print((char)247);  // Degree symbol
+
+  // Servo position bar (horizontal, fills left-to-right)
+  int barY = 40;
+  display.drawRect(24, barY, 100, 6, SSD1306_WHITE);
+  int barWidth = map(servo_angle, 0, 180, 2, 98);
+  display.fillRect(25, barY + 1, barWidth, 4, SSD1306_WHITE);
+}
+
+// Draw motor speed bars (graphical representation)
+void drawMotorBars() {
+  // Motor 1 bar (horizontal, centered at y=50)
+  display.setCursor(0, 48);
+  display.setTextSize(1);
+  display.print("M1:");
+
+  int bar1_center = 64;
+  int bar1_width = map(abs(motor1_speed), 0, 255, 0, 45);
+
+  // Draw center line
+  display.drawFastVLine(bar1_center, 50, 6, SSD1306_WHITE);
+
+  // Draw bar
+  if (motor1_speed > 0) {
+    // Right side (forward)
+    display.fillRect(bar1_center + 1, 51, bar1_width, 4, SSD1306_WHITE);
+    if (motor1_speed > 0) display.drawChar(bar1_center + bar1_width + 3, 48, '>', SSD1306_WHITE, SSD1306_BLACK, 1);
+  } else if (motor1_speed < 0) {
+    // Left side (reverse)
+    display.fillRect(bar1_center - bar1_width, 51, bar1_width, 4, SSD1306_WHITE);
+    if (motor1_speed < 0) display.drawChar(bar1_center - bar1_width - 7, 48, '<', SSD1306_WHITE, SSD1306_BLACK, 1);
+  }
+
+  // Motor 2 bar (horizontal, centered at y=58)
+  display.setCursor(0, 56);
+  display.setTextSize(1);
+  display.print("M2:");
+
+  int bar2_center = 64;
+  int bar2_width = map(abs(motor2_speed), 0, 255, 0, 45);
+
+  // Draw center line
+  display.drawFastVLine(bar2_center, 58, 6, SSD1306_WHITE);
+
+  // Draw bar
+  if (motor2_speed > 0) {
+    // Right side (forward)
+    display.fillRect(bar2_center + 1, 59, bar2_width, 4, SSD1306_WHITE);
+    if (motor2_speed > 0) display.drawChar(bar2_center + bar2_width + 3, 56, '>', SSD1306_WHITE, SSD1306_BLACK, 1);
+  } else if (motor2_speed < 0) {
+    // Left side (reverse)
+    display.fillRect(bar2_center - bar2_width, 59, bar2_width, 4, SSD1306_WHITE);
+    if (motor2_speed < 0) display.drawChar(bar2_center - bar2_width - 7, 56, '<', SSD1306_WHITE, SSD1306_BLACK, 1);
+  }
+}
+
 // ========================================
 // COMMUNICATION CALLBACKS & FUNCTIONS
 // ========================================
@@ -159,6 +298,7 @@ static void notifyCallback(
   bool isNotify) {
   if (length == sizeof(joystickData)) {
     memcpy(&joystickData, pData, sizeof(joystickData));
+    outputsEnabled = true;  // Enable outputs after first valid data
   }
 }
 
@@ -231,7 +371,36 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 #endif
 
 void setup() {
+  // CRITICAL: Disable motor driver power FIRST via enable pin
+  // This cuts power to MX1508 so motors can't move during boot
+  pinMode(MOTOR_ENABLE_PIN, OUTPUT);
+  digitalWrite(MOTOR_ENABLE_PIN, LOW);  // MX1508 has no GND = no power
+
+  // Set motor control pins LOW as well (belt and suspenders)
+  pinMode(MOTOR1_IN1, OUTPUT);
+  pinMode(MOTOR1_IN2, OUTPUT);
+  pinMode(MOTOR2_IN3, OUTPUT);
+  pinMode(MOTOR2_IN4, OUTPUT);
+  pinMode(SERVO_PIN, OUTPUT);
+  digitalWrite(MOTOR1_IN1, LOW);
+  digitalWrite(MOTOR1_IN2, LOW);
+  digitalWrite(MOTOR2_IN3, LOW);
+  digitalWrite(MOTOR2_IN4, LOW);
+  digitalWrite(SERVO_PIN, LOW);
+
+  // Small delay to let pins stabilize before any other init
+  delay(50);
+
   Serial.begin(115200);
+  delay(2000);  // Wait longer for USB-CDC serial to be ready
+  Serial.println("\n\n=== ESP32 Joystick Receiver Starting ===");
+  Serial.flush();
+
+  Serial.println("DEBUG: Setting up LED...");
+  Serial.flush();
+  // Initialize LED pin for status blinking
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH); // Start with LED OFF (active LOW)
 
   #ifdef USE_WIFI
     // WiFi MUST be initialized FIRST, before any other hardware
@@ -303,22 +472,61 @@ void setup() {
     Serial.println("Starting Arduino BLE Client application...");
   #endif
 
-  // Now initialize other hardware
-  // Initialize servo
-  myServo.attach(SERVO_PIN);  // Attach servo to GPIO0
-  myServo.write(90);          // Start at center position (90 degrees)
-  Serial.println("Servo initialized at 90 degrees");
+  // Small delay before servo attach to let things stabilize
+  delay(100);
 
+  // Attach servo and set to center position
+  myServo.attach(SERVO_PIN);
+  myServo.write(90);  // Start at center
+  servoAttached = true;
+  Serial.println("Servo initialized at 90 degrees on GPIO4");
+
+  // Initialize motor PWM (ESP32 LEDC - new API for core 3.x)
+  // New API: ledcAttach(pin, freq, resolution) - no channels needed!
+  ledcAttach(MOTOR1_IN1, MOTOR_PWM_FREQ, MOTOR_PWM_RES);
+  ledcAttach(MOTOR1_IN2, MOTOR_PWM_FREQ, MOTOR_PWM_RES);
+  ledcAttach(MOTOR2_IN3, MOTOR_PWM_FREQ, MOTOR_PWM_RES);
+  ledcAttach(MOTOR2_IN4, MOTOR_PWM_FREQ, MOTOR_PWM_RES);
+
+  // Small delay to let PWM stabilize
+  delay(10);
+
+  // Stop motors explicitly (multiple times to ensure)
+  ledcWrite(MOTOR1_IN1, 0);
+  ledcWrite(MOTOR1_IN2, 0);
+  ledcWrite(MOTOR2_IN3, 0);
+  ledcWrite(MOTOR2_IN4, 0);
+  delay(10);
+  ledcWrite(MOTOR1_IN1, 0);
+  ledcWrite(MOTOR1_IN2, 0);
+  ledcWrite(MOTOR2_IN3, 0);
+  ledcWrite(MOTOR2_IN4, 0);
+
+  Serial.println("Motors initialized (MX1508 driver)");
+  Serial.flush();
+
+  Serial.println("DEBUG: Initializing I2C...");
+  Serial.flush();
   Wire.begin(SDA_PIN, SCL_PIN);
+  Serial.println("I2C initialized on SDA=GPIO6, SCL=GPIO7");
+  Serial.flush();
+
+  Serial.print("DEBUG: Initializing SH1106 display at address 0x");
+  Serial.println(SCREEN_ADDRESS, HEX);
+  Serial.flush();
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
+    Serial.println(F("SH1106 allocation failed"));
+    Serial.flush();
     for(;;);
   }
+  Serial.println("DEBUG: Display initialized OK!");
+  Serial.flush();
 
-  // Set display brightness/contrast
-  display.ssd1306_command(0x81); // Set contrast control
-  display.ssd1306_command(0xFF); // Maximum brightness (255)
+  // Set display brightness to maximum
+  // Set max brightness
+  display.ssd1306_command(SSD1306_SETCONTRAST);
+  display.ssd1306_command(0xFF);
 
   display.clearDisplay();
   display.display();
@@ -355,9 +563,25 @@ void setup() {
     pBLEScan->setActiveScan(true);
     pBLEScan->start(5, false);
   #endif
+
+  // NOW enable motor driver power - all pins are configured correctly
+  Serial.println("Enabling motor driver...");
+  digitalWrite(MOTOR_ENABLE_PIN, HIGH);  // MX1508 now has GND = powered
+  Serial.println("Motor driver enabled. Setup complete.");
 }
 
 void loop() {
+  // Receiver blinks every 3 seconds
+  static unsigned long lastBlink = 0;
+  static bool ledState = false;
+
+  if (millis() - lastBlink > 3000) {
+    ledState = !ledState;
+    digitalWrite(LED_PIN, ledState);
+    lastBlink = millis();
+    Serial.println("RX LED blink (3s interval)");
+  }
+
   #ifdef USE_WIFI
     // WiFi mode: receive UDP packets
     if (wifiConnected) {
@@ -366,6 +590,7 @@ void loop() {
         if (packetSize == sizeof(joystickData)) {
           udp.read((uint8_t*)&joystickData, sizeof(joystickData));
           dataReceived = true;
+          outputsEnabled = true;  // Enable outputs after first valid data
 
           // Store transmitter IP if we didn't find it via mDNS
           if (!transmitterFound) {
@@ -381,32 +606,33 @@ void loop() {
       }
 
       if (dataReceived) {
-        // Control servo based on Joystick 1 X-axis
-        int servoAngle = map(joystickData.joy1_x, 0, 4095, 0, 180);
-        servoAngle = constrain(servoAngle, 0, 180);
-        myServo.write(servoAngle);
+        // Only control outputs after valid data received
+        if (outputsEnabled) {
+          // Control servo based on Joystick 1 X-axis
+          servo_angle = map(joystickData.joy1_x, 0, 4095, 0, 180);
+          servo_angle = constrain(servo_angle, 0, 180);
+          myServo.write(servo_angle);
+
+          // Control motors based on Joystick 2
+          controlMotors(joystickData.joy2_x, joystickData.joy2_y);
+        }
 
         display.clearDisplay();
 
-        // Draw joystick visualizations
-        drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 25, 10, 8, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
-        drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 75, 10, 8, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
+        // Draw joystick visualizations (larger circles for 128x64 display)
+        drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
+        drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
 
         // Draw status indicator
         display.setTextSize(1);
         display.setCursor(98, 0);
         display.print(F("WiFi"));
 
-        // Draw servo position bar at bottom
-        display.drawRect(0, 28, 128, 4, SSD1306_WHITE);
-        int barWidth = map(servoAngle, 0, 180, 2, 126);
-        display.fillRect(1, 29, barWidth, 2, SSD1306_WHITE);
+        // Draw servo position bar
+        drawServoBar();
 
-        // Draw servo angle text above bar
-        display.setCursor(0, 20);
-        display.print("S:");
-        display.print(servoAngle);
-        display.print((char)247);  // Degree symbol
+        // Draw motor speed bars
+        drawMotorBars();
 
         display.display();
       } else {
@@ -436,32 +662,33 @@ void loop() {
     }
 
     if (connected) {
-      // Control servo based on Joystick 1 X-axis
-      int servoAngle = map(joystickData.joy1_x, 0, 4095, 0, 180);
-      servoAngle = constrain(servoAngle, 0, 180);
-      myServo.write(servoAngle);
+      // Only control outputs after valid data received
+      if (outputsEnabled) {
+        // Control servo based on Joystick 1 X-axis
+        servo_angle = map(joystickData.joy1_x, 0, 4095, 0, 180);
+        servo_angle = constrain(servo_angle, 0, 180);
+        myServo.write(servo_angle);
+
+        // Control motors based on Joystick 2
+        controlMotors(joystickData.joy2_x, joystickData.joy2_y);
+      }
 
       display.clearDisplay();
 
-      // Draw joystick visualizations
-      drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 25, 10, 8, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
-      drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 75, 10, 8, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
+      // Draw joystick visualizations (larger circles for 128x64 display)
+      drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
+      drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
 
       // Draw status indicator
       display.setTextSize(1);
       display.setCursor(110, 0);
       display.print(F("RX"));
 
-      // Draw servo position bar at bottom
-      display.drawRect(0, 28, 128, 4, SSD1306_WHITE);
-      int barWidth = map(servoAngle, 0, 180, 2, 126);
-      display.fillRect(1, 29, barWidth, 2, SSD1306_WHITE);
+      // Draw servo position bar
+      drawServoBar();
 
-      // Draw servo angle text above bar
-      display.setCursor(0, 20);
-      display.print("S:");
-      display.print(servoAngle);
-      display.print((char)247);  // Degree symbol
+      // Draw motor speed bars
+      drawMotorBars();
 
       display.display();
     } else if (doScan) {

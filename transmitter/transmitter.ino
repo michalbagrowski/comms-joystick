@@ -2,11 +2,11 @@
 // COMPILE-TIME COMMUNICATION MODE SWITCH
 // ========================================
 // Uncomment the line below to use WiFi instead of BLE
-#define USE_WIFI
+// #define USE_WIFI  // Comment out to use BLE mode
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 
 #ifdef USE_WIFI
   #include <WiFi.h>
@@ -20,7 +20,7 @@
 #endif
 
 #define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
+#define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
 
@@ -38,12 +38,12 @@
 #define LED_PIN 8
 
 // Joystick 1 center values (measured at rest)
-#define JOY1_CENTER_X 3515
-#define JOY1_CENTER_Y 3234
+#define JOY1_CENTER_X 2235
+#define JOY1_CENTER_Y 2217
 
 // Joystick 2 center values (measured at rest)
-#define JOY2_CENTER_X 3352
-#define JOY2_CENTER_Y 3510
+#define JOY2_CENTER_X 2215
+#define JOY2_CENTER_Y 2255
 
 // ========================================
 // COMMUNICATION CONFIGURATION
@@ -60,7 +60,7 @@
   #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #endif
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // ========================================
 // COMMUNICATION GLOBALS
@@ -140,15 +140,15 @@ String getDirection(int x, int y, int centerX, int centerY) {
 }
 
 void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int centerY, int radius, const char* label, int joyCenterX, int joyCenterY) {
-  display.drawCircle(centerX, centerY, radius, SSD1306_WHITE);
+  display.drawCircle(centerX, centerY, radius, SH110X_WHITE);
 
   // Zero state position (bottom-right corner of circle)
   int zeroX = centerX + (radius - 3);
   int zeroY = centerY + (radius - 3);
 
   // Draw crosshairs at zero state position
-  display.drawFastHLine(zeroX - 4, zeroY, 8, SSD1306_WHITE);
-  display.drawFastVLine(zeroX, zeroY - 4, 8, SSD1306_WHITE);
+  display.drawFastHLine(zeroX - 4, zeroY, 8, SH110X_WHITE);
+  display.drawFastVLine(zeroX, zeroY - 4, 8, SH110X_WHITE);
 
   // Calculate offset from joystick center
   int offsetX = joyX - joyCenterX;
@@ -177,9 +177,9 @@ void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int c
   }
 
   if (button == LOW) {
-    display.fillCircle(dotX, dotY, 2, SSD1306_WHITE);
+    display.fillCircle(dotX, dotY, 2, SH110X_WHITE);
   } else {
-    display.drawCircle(dotX, dotY, 2, SSD1306_WHITE);
+    display.drawCircle(dotX, dotY, 2, SH110X_WHITE);
   }
 
   display.setTextSize(1);
@@ -189,9 +189,105 @@ void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int c
   display.print(label);
 }
 
+// Calculate and draw "fake" servo angle based on Joy1 X-axis
+void drawFakeServoAngle(int16_t joy1_x) {
+  // Calculate fake servo angle (same algorithm as receiver)
+  int servo_angle = map(joy1_x, 0, 4095, 0, 180);
+  servo_angle = constrain(servo_angle, 0, 180);
+
+  // Servo angle text
+  display.setCursor(0, 32);
+  display.setTextSize(1);
+  display.print("S:");
+  display.print(servo_angle);
+  display.print((char)247);  // Degree symbol
+
+  // Servo position bar (horizontal, fills left-to-right)
+  int barY = 40;
+  display.drawRect(24, barY, 100, 6, SH110X_WHITE);
+  int barWidth = map(servo_angle, 0, 180, 2, 98);
+  display.fillRect(25, barY + 1, barWidth, 4, SH110X_WHITE);
+}
+
+// Calculate and draw "fake" motor speeds based on Joy2 values
+void drawFakeMotorSpeeds(int16_t joy2_x, int16_t joy2_y) {
+  // Calculate fake motor speeds (same algorithm as receiver)
+  #define MOTOR_DEADZONE 200
+
+  int motor1_speed = 0;
+  int motor2_speed = 0;
+
+  // Motor 1 from Joy2 X-axis
+  int joy2x_offset = joy2_x - JOY2_CENTER_X;
+  if (abs(joy2x_offset) < MOTOR_DEADZONE) {
+    motor1_speed = 0;
+  } else {
+    motor1_speed = map(joy2_x, 0, 4095, -255, 255);
+    motor1_speed = constrain(motor1_speed, -255, 255);
+  }
+
+  // Motor 2 from Joy2 Y-axis
+  int joy2y_offset = joy2_y - JOY2_CENTER_Y;
+  if (abs(joy2y_offset) < MOTOR_DEADZONE) {
+    motor2_speed = 0;
+  } else {
+    motor2_speed = map(joy2_y, 0, 4095, -255, 255);
+    motor2_speed = constrain(motor2_speed, -255, 255);
+  }
+
+  // Draw Motor 1 bar (horizontal, centered at y=50)
+  display.setCursor(0, 48);
+  display.setTextSize(1);
+  display.print("M1:");
+
+  int bar1_center = 64;
+  int bar1_width = map(abs(motor1_speed), 0, 255, 0, 45);
+
+  // Draw center line
+  display.drawFastVLine(bar1_center, 50, 6, SH110X_WHITE);
+
+  // Draw bar
+  if (motor1_speed > 0) {
+    // Right side (forward)
+    display.fillRect(bar1_center + 1, 51, bar1_width, 4, SH110X_WHITE);
+    if (motor1_speed > 0) display.drawChar(bar1_center + bar1_width + 3, 48, '>', SH110X_WHITE, SH110X_BLACK, 1);
+  } else if (motor1_speed < 0) {
+    // Left side (reverse)
+    display.fillRect(bar1_center - bar1_width, 51, bar1_width, 4, SH110X_WHITE);
+    if (motor1_speed < 0) display.drawChar(bar1_center - bar1_width - 7, 48, '<', SH110X_WHITE, SH110X_BLACK, 1);
+  }
+
+  // Draw Motor 2 bar (horizontal, centered at y=58)
+  display.setCursor(0, 56);
+  display.setTextSize(1);
+  display.print("M2:");
+
+  int bar2_center = 64;
+  int bar2_width = map(abs(motor2_speed), 0, 255, 0, 45);
+
+  // Draw center line
+  display.drawFastVLine(bar2_center, 58, 6, SH110X_WHITE);
+
+  // Draw bar
+  if (motor2_speed > 0) {
+    // Right side (forward)
+    display.fillRect(bar2_center + 1, 59, bar2_width, 4, SH110X_WHITE);
+    if (motor2_speed > 0) display.drawChar(bar2_center + bar2_width + 3, 56, '>', SH110X_WHITE, SH110X_BLACK, 1);
+  } else if (motor2_speed < 0) {
+    // Left side (reverse)
+    display.fillRect(bar2_center - bar2_width, 59, bar2_width, 4, SH110X_WHITE);
+    if (motor2_speed < 0) display.drawChar(bar2_center - bar2_width - 7, 56, '<', SH110X_WHITE, SH110X_BLACK, 1);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
+  delay(2000);  // Wait longer for USB-CDC serial to be ready
+  Serial.println("\n\n=== ESP32 Joystick Transmitter Starting ===");
+  Serial.flush();
 
+  Serial.println("DEBUG: Setting up LED...");
+  Serial.flush();
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH); // Start with LED OFF
 
@@ -250,24 +346,39 @@ void setup() {
   analogReadResolution(12); // 12-bit resolution (0-4095)
   analogSetAttenuation(ADC_11db); // 0-3.3V range
 
+  Serial.println("DEBUG: Initializing I2C...");
+  Serial.flush();
   Wire.begin(SDA_PIN, SCL_PIN);
+  Serial.println("I2C initialized on SDA=GPIO6, SCL=GPIO7");
+  Serial.flush();
 
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
+  Serial.print("Initializing SH1106 display at address 0x");
+  Serial.println(SCREEN_ADDRESS, HEX);
+  Serial.flush();
+
+  if(!display.begin(SCREEN_ADDRESS, true)) {
+    Serial.println(F("SH1106 allocation failed!"));
+    Serial.flush();
+    // Blink error pattern
+    while(true) {
+      digitalWrite(LED_PIN, LOW);
+      delay(100);
+      digitalWrite(LED_PIN, HIGH);
+      delay(100);
+    }
   }
+  Serial.println("DEBUG: Display initialized OK!");
+  Serial.flush();
+  Serial.println("Display initialized successfully!");
 
-  // Set display brightness/contrast
-  display.ssd1306_command(0x81); // Set contrast control
-  display.ssd1306_command(0xFF); // Maximum brightness (255)
-
+  display.setContrast(255);  // Maximum brightness
   display.clearDisplay();
   display.display();
   delay(100);
 
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
 
   #ifdef USE_WIFI
@@ -315,10 +426,12 @@ void loop() {
   static bool ledState = false;
   static unsigned long lastUpdate = 0;
 
-  if (millis() - lastBlink > 500) {
+  // Transmitter blinks every 1 second
+  if (millis() - lastBlink > 1000) {
     ledState = !ledState;
     digitalWrite(LED_PIN, ledState);
     lastBlink = millis();
+    Serial.println("TX LED blink (1s interval)");
   }
 
   if (millis() - lastUpdate > 100) {
@@ -366,9 +479,9 @@ void loop() {
 
     display.clearDisplay();
 
-    // Draw joystick visualizations (smaller circles for compact display)
-    drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 25, 12, 10, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
-    drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 75, 12, 10, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
+    // Draw joystick visualizations (larger circles for 128x64 display)
+    drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
+    drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
 
     // Draw status indicator
     display.setTextSize(1);
@@ -388,12 +501,11 @@ void loop() {
       }
     #endif
 
-    // Draw bottom info bar with raw values
-    display.setCursor(0, 25);
-    display.setTextSize(1);
-    display.print(joystickData.joy1_x);
-    display.setCursor(52, 25);
-    display.print(joystickData.joy2_x);
+    // Draw fake servo angle based on Joy1 X-axis
+    drawFakeServoAngle(joystickData.joy1_x);
+
+    // Draw fake motor speeds based on Joy2
+    drawFakeMotorSpeeds(joystickData.joy2_x, joystickData.joy2_y);
 
     display.display();
 
