@@ -1,7 +1,7 @@
 # Complete Wiring Guide - ESP32 Dual Joystick Controller
 
-**Last Updated:** 2026-01-20
-**Hardware Version:** v2.0 with DC motors and 128x64 displays
+**Last Updated:** 2026-01-26
+**Hardware Version:** v2.1 with DC motors, servo, and motor enable circuit
 
 ---
 
