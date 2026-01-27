@@ -1,7 +1,7 @@
 # Complete Wiring Guide - ESP32 Dual Joystick Controller
 
-**Last Updated:** 2026-01-26
-**Hardware Version:** v2.1 with DC motors, servo, and motor enable circuit
+**Last Updated:** 2026-01-27
+**Hardware Version:** v2.2 with DC motors, servo, motor enable circuit, and LiPo battery support
 
 ---
 
@@ -45,6 +45,7 @@
 | 6 | Display | SDA (I2C data) |
 | 7 | Display | SCL (I2C clock) |
 | 8 | Built-in | LED (blinks) |
+| 10 | Battery | Voltage sense (via divider) |
 | 3.3V | Power | Joysticks + Display |
 | GND | Ground | Common ground |
 
@@ -220,6 +221,7 @@ Before powering on, verify each connection:
 | 6 | Display | SDA (I2C data) |
 | 7 | Display | SCL (I2C clock) |
 | 8 | Built-in | LED (status) |
+| 10 | Battery | Voltage sense (via divider) |
 | 5V | MX1508 + Servo | VCC (motor + servo power) |
 | 3.3V | Display | VCC (display power) |
 | GND | All | Common ground |
@@ -540,6 +542,285 @@ Before powering on, verify each connection:
 
 ---
 
+# LIPO BATTERY POWER (OPTIONAL)
+
+## Overview
+
+Both boards can run on single-cell LiPo batteries (3.7V nominal) for portable operation. The code includes battery monitoring with low-voltage protection.
+
+**LiPo Battery Basics:**
+- **Voltage range:** 3.0V (empty) to 4.2V (full)
+- **Nominal voltage:** 3.7V
+- **⚠️ CRITICAL:** Never discharge below 3.0V (damages battery permanently)
+- **Recommended capacity:** 500-2000mAh depending on runtime needs
+
+## TX: LiPo Battery Circuit
+
+### Components Needed
+
+| Qty | Component | Purpose |
+|-----|-----------|---------|
+| 1 | 1S LiPo Battery (3.7V, 500-1000mAh) | Power source |
+| 2 | 10K Resistors | Voltage divider for monitoring |
+| 1 | 100µF Electrolytic Capacitor | Power smoothing |
+| 1 | 0.1µF Ceramic Capacitor | High-freq noise filtering |
+| 1 | JST-PH 2.0 connector (optional) | Battery connection |
+
+### TX Battery Pin Summary
+
+| GPIO | Function |
+|------|----------|
+| 10 | Battery voltage sensing (via voltage divider) |
+
+### TX Battery Wiring
+
+**Voltage Divider Circuit:**
+```
+LiPo (+) ────┬──────────────────────► ESP32 3.3V/VIN
+             │
+            [10K]  R1
+             │
+             ├──────────────────────► GPIO10 (ADC)
+             │
+            [10K]  R2
+             │
+LiPo (-) ────┴──────────────────────► ESP32 GND
+```
+
+**Complete TX LiPo Circuit:**
+```
+                    ┌─────────────────────────┐
+                    │   ESP32-C3 SUPER MINI   │
+                    │                         │
+   LiPo Battery     │                         │
+   ┌─────────┐      │  3.3V ◄── LiPo (+)      │
+   │ ═══════ │──(+)─┤                         │
+   │  3.7V   │      │  GND ◄── LiPo (-)       │
+   │ ═══════ │──(-)─┤                         │
+   └─────────┘      │                         │
+        │           │  GPIO10 ◄── VBAT sense  │
+        │           │      │                  │
+        │           └──────┼──────────────────┘
+        │                  │
+        │    Voltage       │
+        │    Divider:      │
+        │                  │
+        └──(+)──[10K]──┬───┘
+                       │
+                      [10K]
+                       │
+        └──(-)─────────┘
+```
+
+**Decoupling Capacitors (add close to ESP32):**
+```
+LiPo (+) ────┬──[100µF]──┬── ESP32 3.3V/VIN
+             │           │
+             └─[0.1µF]───┘
+                  │
+LiPo (-) ─────────┴─────────── ESP32 GND
+```
+
+**Why voltage divider:**
+- LiPo outputs 3.0-4.2V
+- ESP32 ADC max input: 3.3V
+- Divider ratio: 10K/(10K+10K) = 0.5
+- 4.2V × 0.5 = 2.1V (safe for ADC)
+- Code multiplies by 2.0 to get actual voltage
+
+### TX Battery Checklist
+
+- [ ] LiPo (+) → ESP32 3.3V/VIN pin (or through switch)
+- [ ] LiPo (-) → ESP32 GND
+- [ ] 10K resistor from LiPo (+) to GPIO10
+- [ ] 10K resistor from GPIO10 to GND
+- [ ] 100µF capacitor across LiPo (+) and (-)
+- [ ] 0.1µF capacitor across LiPo (+) and (-)
+- [ ] Battery fully charged before first use
+
+## RX: LiPo Battery Circuit
+
+**⚠️ RX is more complex because servo needs 5V!**
+
+The servo (SG90) requires 5V to operate properly. LiPo provides 3.7V, so you need a boost converter.
+
+### Components Needed
+
+| Qty | Component | Purpose |
+|-----|-----------|---------|
+| 1 | 1S LiPo Battery (3.7V, 1000-2000mAh) | Power source |
+| 1 | MT3608 Boost Converter | 3.7V → 5V for servo/motors |
+| 2 | 10K Resistors | Voltage divider for monitoring |
+| 1 | 1000µF Electrolytic Capacitor | Motor power smoothing |
+| 2 | 100µF Electrolytic Capacitor | ESP32 + boost converter smoothing |
+| 2 | 0.1µF Ceramic Capacitor | High-freq noise filtering |
+| 1 | JST-PH 2.0 connector (optional) | Battery connection |
+
+### RX Battery Pin Summary
+
+| GPIO | Function |
+|------|----------|
+| 10 | Battery voltage sensing (via voltage divider) |
+
+### RX Battery Wiring
+
+**Power Distribution:**
+```
+                                ┌──────────────────┐
+                                │  MT3608 Boost    │
+                                │  Converter       │
+LiPo (+) ───┬───────────────────┤ VIN+      VOUT+ ├───► 5V (Servo, MX1508)
+            │                   │                  │
+            │                   │ VIN-      VOUT- ├───► GND
+            │                   └────────┬─────────┘
+            │                            │
+            └───────────────────┬────────┘
+                                │
+                            ESP32 VIN/3.3V
+                                │
+LiPo (-) ───────────────────────┴──────────────────► GND (all)
+```
+
+**Complete RX LiPo Circuit:**
+```
+   LiPo Battery                    MT3608 Boost
+   ┌─────────┐                    ┌───────────┐
+   │ ═══════ │──(+)──┬────────────┤VIN+  VOUT+├──► 5V (Servo VCC)
+   │ 1000mAh │       │            │           │      (MX1508 VCC)
+   │  3.7V   │       │            │VIN-  VOUT-├──► GND
+   │ ═══════ │──(-)──┼────────────┤           │
+   └─────────┘       │            └───────────┘
+                     │                │
+                     │                │ (Adjust pot to 5.0V output!)
+                     │                │
+                     │     ┌──────────┴──────────┐
+                     │     │   ESP32-C3 SUPER    │
+                     │     │                     │
+                     └─────┤ VIN/3.3V       5V   │ ◄─ Connect boost 5V here
+                           │                     │
+                           │ GND                 │
+                           │                     │
+Voltage                    │ GPIO10 ◄── VBAT    │
+Divider:                   │      │              │
+                           └──────┼──────────────┘
+LiPo(+)──[10K]──┬───────────────┘
+                │
+               [10K]
+                │
+LiPo(-)─────────┘
+```
+
+**Capacitor Placement:**
+```
+Location 1: At LiPo output (before boost converter)
+─────────────────────────────────────────────────────
+LiPo (+) ────┬──[100µF]──┬── To MT3608 VIN+
+             └─[0.1µF]───┘
+LiPo (-) ────────────────── To MT3608 VIN-
+
+Location 2: At boost converter output
+─────────────────────────────────────────────────────
+Boost VOUT+ ─┬──[100µF]──┬── To Servo/MX1508 VCC
+             └─[0.1µF]───┘
+Boost VOUT- ─────────────── To GND
+
+Location 3: At motor driver (handles motor spikes)
+─────────────────────────────────────────────────────
+MX1508 VCC ──┬──[1000µF]─┬── (same connection)
+             │           │
+MX1508 GND ──┴───────────┴── (same connection)
+```
+
+### MT3608 Boost Converter Setup
+
+**Before connecting:**
+1. Connect multimeter to VOUT+/VOUT-
+2. Apply 3.7V to VIN+/VIN-
+3. Adjust potentiometer until output reads **5.0V**
+4. Mark the position!
+
+**MT3608 Pinout:**
+```
+    ┌─────────────────┐
+    │     MT3608      │
+    │   ┌─────────┐   │
+    │   │   POT   │   │ ← Adjustment potentiometer
+    │   └─────────┘   │
+    │                 │
+    │ VIN+  VIN-  VOUT+  VOUT- │
+    └──┬─────┬──────┬──────┬───┘
+       │     │      │      │
+    3.7V   GND    5V    GND
+    from   from   to    to
+    LiPo   LiPo  servo  servo
+                  etc   etc
+```
+
+### RX Battery Checklist
+
+- [ ] LiPo (+) → MT3608 VIN+ AND voltage divider
+- [ ] LiPo (-) → MT3608 VIN- AND ESP32 GND
+- [ ] MT3608 VOUT+ → ESP32 5V pin (for servo/motors)
+- [ ] MT3608 VOUT- → ESP32 GND
+- [ ] MT3608 output adjusted to 5.0V
+- [ ] ESP32 VIN/3.3V ← LiPo (+) directly (3.3V regulator handles it)
+- [ ] 10K resistor from LiPo (+) to GPIO10
+- [ ] 10K resistor from GPIO10 to GND
+- [ ] 100µF capacitor at LiPo (before boost)
+- [ ] 100µF capacitor at boost output
+- [ ] 1000µF capacitor at MX1508 (motor power)
+- [ ] 0.1µF ceramic capacitors at each location
+- [ ] Battery fully charged before first use
+
+## Battery Monitoring in Code
+
+The code automatically:
+1. Reads battery voltage every 1 second
+2. Shows battery icon on display (3 bars = full, 0 bars = empty)
+3. Flashes battery icon when voltage < 3.5V (warning)
+4. Disables motors and shows "LOW BATTERY" when voltage < 3.3V
+5. Halts completely if voltage < 3.2V on boot (critical)
+
+**Battery voltage thresholds:**
+| Voltage | Status | Action |
+|---------|--------|--------|
+| 4.2V | Full (100%) | Normal operation |
+| 3.7V | Medium (50%) | Normal operation |
+| 3.5V | Low (25%) | Warning icon flashes |
+| 3.3V | Critical (10%) | Motors disabled, warning shown |
+| 3.2V | Empty | Boot halted, "BATTERY CRITICAL" |
+| <3.0V | Damaged | Battery may be permanently damaged |
+
+## LiPo Safety Warnings
+
+### ⚠️ CRITICAL SAFETY RULES
+
+1. **Never discharge below 3.0V** - damages battery permanently
+2. **Never charge unattended** - fire risk
+3. **Use proper LiPo charger** - don't charge from USB
+4. **Store at 3.7-3.8V** - for long-term storage
+5. **Inspect before use** - check for swelling, damage
+6. **Don't puncture or crush** - fire/explosion risk
+7. **Keep away from heat** - batteries expand when hot
+
+### ⚠️ What to do if battery swells
+
+1. **STOP using immediately**
+2. Place in fireproof container (metal box, sand)
+3. Take outdoors away from buildings
+4. Dispose at battery recycling center
+5. **DO NOT puncture or throw in trash**
+
+### ⚠️ Charging
+
+- Use dedicated LiPo charger (1S, 4.2V)
+- Never charge above 1C rate (e.g., 500mA for 500mAh battery)
+- Charge on fireproof surface
+- Never leave charging unattended
+- Stop charging when full (charger auto-stops at 4.2V)
+
+---
+
 # POWER REQUIREMENTS
 
 ## TX Power Budget
@@ -550,9 +831,15 @@ Before powering on, verify each connection:
 | Joystick 1 | 3.3V | 10mA | 0.03W |
 | Joystick 2 | 3.3V | 10mA | 0.03W |
 | OLED 128x64 | 3.3V | 20mA | 0.07W |
-| **TOTAL** | **5V** | **~250mA** | **~0.8W** |
+| **TOTAL** | **3.3-5V** | **~250mA** | **~0.8W** |
 
-**Power Source:** USB-C (computer or wall adapter)
+**Power Sources:**
+- USB-C (computer or wall adapter) - 5V
+- 1S LiPo battery (500-1000mAh) - 3.7V nominal
+
+**LiPo Runtime Estimate:**
+- 500mAh battery: ~2 hours
+- 1000mAh battery: ~4 hours
 
 ## RX Power Budget
 
@@ -584,6 +871,12 @@ Before powering on, verify each connection:
    - 5V 3A bench supply
    - Connect to ESP32 5V/GND pins
    - Most stable option
+
+4. **1S LiPo Battery + Boost Converter** - ✅ Portable
+   - 1000-2000mAh battery recommended
+   - MT3608 boost converter for 5V
+   - Runtime: 20-60 minutes under load
+   - Battery monitoring protects from over-discharge
 
 ---
 
@@ -800,6 +1093,20 @@ Why:
 | 1 | Breadboard 830 points | RX prototyping |
 | 30+ | Jumper Wires | Various connections |
 
+## LiPo Battery Components (for portable operation)
+
+| Qty | Component | Purpose |
+|-----|-----------|---------|
+| 1 | 1S LiPo Battery 500-1000mAh | TX power source |
+| 1 | 1S LiPo Battery 1000-2000mAh | RX power source |
+| 1 | MT3608 Boost Converter | 3.7V→5V for RX servo/motors |
+| 4 | 10K Resistor | Voltage dividers (2 per board) |
+| 2 | 100µF Electrolytic Capacitor | Power smoothing |
+| 2 | 0.1µF Ceramic Capacitor | High-freq noise filtering |
+| 1 | 1S LiPo Charger | Battery charging (TP4056 module) |
+| 2 | JST-PH 2.0 Connector | Battery connection (optional) |
+| 1 | SPDT Slide Switch | Power on/off (optional) |
+
 ## Tools Needed
 
 | Tool | Purpose |
@@ -859,6 +1166,6 @@ Use these colors for easier debugging:
 
 ---
 
-**Document Version:** 2.0
-**Last Verified:** 2026-01-20
+**Document Version:** 2.2
+**Last Verified:** 2026-01-27
 **For help:** See README.md or CLAUDE.md

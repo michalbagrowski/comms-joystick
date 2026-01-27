@@ -10,6 +10,7 @@ Wireless dual-joystick controller with servo and DC motor control using ESP32-C3
 - **Two communication modes:** BLE (default) or WiFi
 - **OLED displays** on both boards
 - **Boot-safe motor enable circuit** (prevents motor twitch on power-up)
+- **LiPo battery support** with voltage monitoring and low-battery protection
 
 ## Hardware
 
@@ -40,6 +41,7 @@ Wireless dual-joystick controller with servo and DC motor control using ESP32-C3
 | 6 | I2C SDA (Display) |
 | 7 | I2C SCL (Display) |
 | 8 | LED (blinks 1s) |
+| 10 | Battery voltage sense |
 
 ### Receiver
 | GPIO | Function |
@@ -53,6 +55,7 @@ Wireless dual-joystick controller with servo and DC motor control using ESP32-C3
 | 6 | I2C SDA (Display) |
 | 7 | I2C SCL (Display) |
 | 8 | LED (blinks 3s) |
+| 10 | Battery voltage sense |
 
 ## Quick Start
 
@@ -102,8 +105,15 @@ See `WIFI_SETUP.md` for details.
 
 ## Power Requirements
 
+**USB Power:**
 - **TX:** USB power (500mA)
 - **RX:** 5V 2A+ adapter recommended (motors draw significant current)
+
+**LiPo Battery (portable):**
+- **TX:** 1S LiPo 500-1000mAh (~2-4 hours runtime)
+- **RX:** 1S LiPo 1000-2000mAh + MT3608 boost converter for 5V
+
+See `WIRING.md` for battery circuit diagrams.
 
 ## Documentation
 
@@ -121,6 +131,9 @@ See `WIFI_SETUP.md` for details.
 | No BLE connection | Reset both boards, wait 10s |
 | Motors weak | Use 5V 2A+ power adapter |
 | ESP32 resets | Insufficient power for motors |
+| Battery icon shows empty | Check voltage divider wiring (GPIO10) |
+| "LOW BATTERY" warning | Charge or replace LiPo battery |
+| Motors disabled | Battery voltage below 3.3V, charge battery |
 
 ## Make Commands
 

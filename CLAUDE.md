@@ -1,6 +1,6 @@
 # ESP32 Wireless Joystick Controller - Technical Reference
 
-**Last Updated:** 2026-01-26
+**Last Updated:** 2026-01-27
 
 ## Project Summary
 
@@ -29,6 +29,7 @@ Wireless dual-joystick controller with servo and DC motor control between two ES
 | 6 | I2C SDA | Display |
 | 7 | I2C SCL | Display |
 | 8 | LED | Blinks every 1s |
+| 10 | VBAT | Battery voltage (via divider) |
 
 - **Display:** 1.9" OLED 128x64 SH1106 @ 0x3C
 - **Library:** Adafruit_SH110X
@@ -45,6 +46,7 @@ Wireless dual-joystick controller with servo and DC motor control between two ES
 | 6 | I2C SDA | Display |
 | 7 | I2C SCL | Display |
 | 8 | LED | Blinks every 3s |
+| 10 | VBAT | Battery voltage (via divider) |
 
 - **Display:** 1.3" OLED 128x64 SSD1306 @ 0x3C
 - **Library:** Adafruit_SSD1306
@@ -125,8 +127,38 @@ struct JoystickData {
 | Servo | 5V | 100-500mA |
 | Motors (x2) | 5V via MX1508 | 1-2A each |
 
-**TX:** USB power sufficient
-**RX:** 5V 2A+ adapter recommended
+**TX:** USB power sufficient, or 1S LiPo (500-1000mAh)
+**RX:** 5V 2A+ adapter recommended, or 1S LiPo + MT3608 boost converter
+
+---
+
+## Battery Monitoring
+
+Both boards support LiPo battery operation with voltage monitoring.
+
+**Circuit:** Voltage divider (10K + 10K) on GPIO10
+- Divider ratio: 0.5 (4.2V → 2.1V safe for ADC)
+- Code multiplies by 2.0 to get actual voltage
+
+**Thresholds:**
+| Voltage | Status | Action |
+|---------|--------|--------|
+| 4.2V | Full | Normal |
+| 3.5V | Low | Warning icon flashes |
+| 3.3V | Critical | Motors disabled (RX) |
+| 3.2V | Empty | Boot halted |
+
+**Code pattern:**
+```c
+float readBatteryVoltage() {
+  long sum = 0;
+  for (int i = 0; i < 10; i++) {
+    sum += analogRead(VBAT_PIN);
+  }
+  float avgRaw = sum / 10;
+  return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
+}
+```
 
 ---
 
@@ -152,6 +184,9 @@ make list-ports          # Show USB ports
 | ESP32 resets | Insufficient power, use 5V 2A+ adapter |
 | Motors weak | Power supply can't provide enough current |
 | Joystick center off | Update center values in code |
+| Battery icon empty | Check voltage divider (2x 10K on GPIO10) |
+| "LOW BATTERY" shown | Charge LiPo, voltage below 3.3V |
+| Motors disabled | Battery critically low, charge immediately |
 
 ---
 

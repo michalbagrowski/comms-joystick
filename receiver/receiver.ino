@@ -43,6 +43,19 @@
 // This prevents motor twitch during boot (MX1508 has no power until code enables it)
 #define MOTOR_ENABLE_PIN 5
 
+// ========================================
+// BATTERY MONITORING (LiPo)
+// ========================================
+// Voltage divider: LiPo+ --[10K]--+--[10K]-- GND
+//                                 |
+//                              GPIO10
+#define VBAT_PIN 10
+#define VBAT_DIVIDER 2.0          // Voltage divider ratio (10K/10K)
+#define VBAT_WARNING 3.5          // Low battery warning threshold
+#define VBAT_CUTOFF 3.3           // Shutdown threshold (protect LiPo)
+#define VBAT_FULL 4.2             // Fully charged
+#define VBAT_SAMPLES 10           // ADC samples for averaging
+
 // Motor control constants
 #define MOTOR_DEADZONE 200   // Deadzone around center to prevent motor jitter
 #define MOTOR_PWM_FREQ 20000 // 20kHz PWM frequency for motors
@@ -112,6 +125,51 @@ struct JoystickData {
 // Flag to prevent motor/servo activation until valid data received
 volatile bool outputsEnabled = false;  // volatile for BLE callback safety
 bool servoAttached = false;
+
+// Battery monitoring
+float batteryVoltage = 4.2;  // Current battery voltage
+bool lowBatteryWarning = false;
+bool batteryShutdown = false;
+
+// Read battery voltage with averaging
+float readBatteryVoltage() {
+  long sum = 0;
+  for (int i = 0; i < VBAT_SAMPLES; i++) {
+    sum += analogRead(VBAT_PIN);
+    delayMicroseconds(100);
+  }
+  float avgRaw = sum / VBAT_SAMPLES;
+  // Convert to voltage: (raw / 4095) * 3.3V * divider_ratio
+  return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
+}
+
+// Get battery percentage (approximate)
+int getBatteryPercent() {
+  // LiPo discharge curve is non-linear, this is simplified
+  if (batteryVoltage >= 4.2) return 100;
+  if (batteryVoltage <= 3.3) return 0;
+  return (int)((batteryVoltage - 3.3) / (4.2 - 3.3) * 100);
+}
+
+// Draw battery icon on display
+void drawBatteryIcon(int x, int y) {
+  int percent = getBatteryPercent();
+
+  // Battery outline (16x8 pixels)
+  display.drawRect(x, y, 14, 8, SSD1306_WHITE);
+  display.fillRect(x + 14, y + 2, 2, 4, SSD1306_WHITE);  // Positive terminal
+
+  // Fill level (0-3 bars)
+  int bars = (percent + 16) / 33;  // 0-3 bars
+  if (bars > 0) display.fillRect(x + 2, y + 2, 3, 4, SSD1306_WHITE);
+  if (bars > 1) display.fillRect(x + 6, y + 2, 3, 4, SSD1306_WHITE);
+  if (bars > 2) display.fillRect(x + 10, y + 2, 2, 4, SSD1306_WHITE);
+
+  // Blink if low battery
+  if (lowBatteryWarning && (millis() / 500) % 2 == 0) {
+    display.fillRect(x, y, 14, 8, SSD1306_INVERSE);
+  }
+}
 
 String getDirection(int x, int y, int centerX, int centerY) {
   int threshold = 1500;
@@ -402,6 +460,26 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH); // Start with LED OFF (active LOW)
 
+  // Initialize battery monitoring
+  pinMode(VBAT_PIN, INPUT);
+  batteryVoltage = readBatteryVoltage();
+  Serial.print("Battery voltage: ");
+  Serial.print(batteryVoltage);
+  Serial.println("V");
+
+  // Check for critically low battery before proceeding
+  if (batteryVoltage < VBAT_CUTOFF && batteryVoltage > 1.0) {  // >1.0 means battery connected
+    Serial.println("CRITICAL: Battery too low! Halting to protect LiPo.");
+    batteryShutdown = true;
+    // Rapid LED blink to indicate low battery
+    while (true) {
+      digitalWrite(LED_PIN, LOW);
+      delay(100);
+      digitalWrite(LED_PIN, HIGH);
+      delay(100);
+    }
+  }
+
   #ifdef USE_WIFI
     // WiFi MUST be initialized FIRST, before any other hardware
     Serial.println("Starting WiFi Receiver...");
@@ -582,6 +660,47 @@ void loop() {
     Serial.println("RX LED blink (3s interval)");
   }
 
+  // ========================================
+  // BATTERY MONITORING (check every 1 second)
+  // ========================================
+  static unsigned long lastBatteryCheck = 0;
+  if (millis() - lastBatteryCheck > 1000) {
+    lastBatteryCheck = millis();
+    batteryVoltage = readBatteryVoltage();
+
+    // Only check if battery seems connected (voltage > 1V)
+    if (batteryVoltage > 1.0) {
+      // Low battery warning
+      if (batteryVoltage < VBAT_WARNING && !lowBatteryWarning) {
+        lowBatteryWarning = true;
+        Serial.println("WARNING: Low battery!");
+      }
+
+      // Critical shutdown
+      if (batteryVoltage < VBAT_CUTOFF) {
+        Serial.println("CRITICAL: Battery cutoff! Disabling motors.");
+        batteryShutdown = true;
+        digitalWrite(MOTOR_ENABLE_PIN, LOW);  // Disable motors
+        outputsEnabled = false;
+      }
+    }
+  }
+
+  // If battery shutdown, show warning and don't process
+  if (batteryShutdown) {
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setCursor(10, 20);
+    display.print(F("LOW BATT"));
+    display.setTextSize(1);
+    display.setCursor(20, 45);
+    display.print(batteryVoltage, 2);
+    display.print(F("V"));
+    display.display();
+    delay(500);
+    return;  // Skip rest of loop
+  }
+
   #ifdef USE_WIFI
     // WiFi mode: receive UDP packets
     if (wifiConnected) {
@@ -623,10 +742,11 @@ void loop() {
         drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
         drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
 
-        // Draw status indicator
+        // Draw status indicator and battery
         display.setTextSize(1);
         display.setCursor(98, 0);
         display.print(F("WiFi"));
+        drawBatteryIcon(80, 0);  // Battery icon top-right area
 
         // Draw servo position bar
         drawServoBar();
@@ -679,10 +799,11 @@ void loop() {
       drawJoystick(joystickData.joy1_x, joystickData.joy1_y, joystickData.joy1_sw, 32, 18, 14, "J1", JOY1_CENTER_X, JOY1_CENTER_Y);
       drawJoystick(joystickData.joy2_x, joystickData.joy2_y, joystickData.joy2_sw, 96, 18, 14, "J2", JOY2_CENTER_X, JOY2_CENTER_Y);
 
-      // Draw status indicator
+      // Draw status indicator and battery
       display.setTextSize(1);
       display.setCursor(110, 0);
       display.print(F("RX"));
+      drawBatteryIcon(90, 0);  // Battery icon top-right area
 
       // Draw servo position bar
       drawServoBar();

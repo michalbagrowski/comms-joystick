@@ -37,6 +37,18 @@
 
 #define LED_PIN 8
 
+// ========================================
+// BATTERY MONITORING (LiPo)
+// ========================================
+// Voltage divider: LiPo+ --[10K]--+--[10K]-- GND
+//                                 |
+//                              GPIO10
+#define VBAT_PIN 10
+#define VBAT_DIVIDER 2.0          // Voltage divider ratio (10K/10K)
+#define VBAT_WARNING 3.5          // Low battery warning threshold
+#define VBAT_CUTOFF 3.3           // Shutdown threshold (protect LiPo)
+#define VBAT_SAMPLES 10           // ADC samples for averaging
+
 // Joystick 1 center values (measured at rest)
 #define JOY1_CENTER_X 2235
 #define JOY1_CENTER_Y 2217
@@ -84,6 +96,48 @@ struct JoystickData {
   int16_t joy2_y;
   uint8_t joy2_sw;
 } joystickData;
+
+// Battery monitoring
+float batteryVoltage = 4.2;  // Current battery voltage
+bool lowBatteryWarning = false;
+
+// Read battery voltage with averaging
+float readBatteryVoltage() {
+  long sum = 0;
+  for (int i = 0; i < VBAT_SAMPLES; i++) {
+    sum += analogRead(VBAT_PIN);
+    delayMicroseconds(100);
+  }
+  float avgRaw = sum / VBAT_SAMPLES;
+  return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
+}
+
+// Get battery percentage
+int getBatteryPercent() {
+  if (batteryVoltage >= 4.2) return 100;
+  if (batteryVoltage <= 3.3) return 0;
+  return (int)((batteryVoltage - 3.3) / (4.2 - 3.3) * 100);
+}
+
+// Draw battery icon on display
+void drawBatteryIcon(int x, int y) {
+  int percent = getBatteryPercent();
+
+  // Battery outline (16x8 pixels)
+  display.drawRect(x, y, 14, 8, SH110X_WHITE);
+  display.fillRect(x + 14, y + 2, 2, 4, SH110X_WHITE);
+
+  // Fill level (0-3 bars)
+  int bars = (percent + 16) / 33;
+  if (bars > 0) display.fillRect(x + 2, y + 2, 3, 4, SH110X_WHITE);
+  if (bars > 1) display.fillRect(x + 6, y + 2, 3, 4, SH110X_WHITE);
+  if (bars > 2) display.fillRect(x + 10, y + 2, 2, 4, SH110X_WHITE);
+
+  // Blink if low battery
+  if (lowBatteryWarning && (millis() / 500) % 2 == 0) {
+    display.fillRect(x, y, 14, 8, SH110X_WHITE);
+  }
+}
 
 // Smoothing filter - exponential moving average
 // Alpha = 0.3 means 30% new value, 70% old value (adjust 0.1-0.5)
@@ -291,6 +345,24 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH); // Start with LED OFF
 
+  // Initialize battery monitoring
+  pinMode(VBAT_PIN, INPUT);
+  batteryVoltage = readBatteryVoltage();
+  Serial.print("Battery voltage: ");
+  Serial.print(batteryVoltage);
+  Serial.println("V");
+
+  // Check for critically low battery
+  if (batteryVoltage < VBAT_CUTOFF && batteryVoltage > 1.0) {
+    Serial.println("CRITICAL: Battery too low!");
+    while (true) {
+      digitalWrite(LED_PIN, LOW);
+      delay(100);
+      digitalWrite(LED_PIN, HIGH);
+      delay(100);
+    }
+  }
+
   #ifdef USE_WIFI
     // WiFi MUST be initialized FIRST, before any other hardware
     Serial.println("Starting WiFi Transmitter...");
@@ -434,6 +506,17 @@ void loop() {
     Serial.println("TX LED blink (1s interval)");
   }
 
+  // Battery check every 1 second
+  static unsigned long lastBatteryCheck = 0;
+  if (millis() - lastBatteryCheck > 1000) {
+    lastBatteryCheck = millis();
+    batteryVoltage = readBatteryVoltage();
+
+    if (batteryVoltage > 1.0 && batteryVoltage < VBAT_WARNING) {
+      lowBatteryWarning = true;
+    }
+  }
+
   if (millis() - lastUpdate > 100) {
     // Read raw ADC values with oversampling
     int raw_j1x = readADC(JOY1_VRX);
@@ -485,6 +568,9 @@ void loop() {
 
     // Draw status indicator
     display.setTextSize(1);
+    // Draw battery icon
+    drawBatteryIcon(62, 0);
+
     #ifdef USE_WIFI
       display.setCursor(98, 0);
       if (wifiConnected) {
