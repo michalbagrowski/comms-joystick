@@ -1,11 +1,14 @@
-.PHONY: all install-cli install-core install-libs compile-transmitter compile-receiver compile upload-transmitter upload-receiver clean monitor-transmitter monitor-receiver help wifi-compile-transmitter wifi-compile-receiver wifi-compile wifi-upload-transmitter wifi-upload-receiver wifi-all
+.PHONY: all install-cli install-core install-libs compile-transmitter compile-receiver compile upload-transmitter upload-receiver clean monitor-transmitter monitor-receiver help wifi-compile-transmitter wifi-compile-receiver wifi-compile wifi-upload-transmitter wifi-upload-receiver wifi-all compact-compile compact-upload compact-all
 
 ARDUINO_CLI = arduino-cli
 BOARD_FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc
+# XIAO ESP32-C3 uses same FQBN as ESP32-C3
+XIAO_FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc
 BOARD_NAME = esp32:esp32
 
 TX_SKETCH = transmitter/transmitter.ino
 RX_SKETCH = receiver/receiver.ino
+RX_COMPACT_SKETCH = receiver_compact/receiver_compact.ino
 
 TX_PORT ?= $(shell arduino-cli board list | grep "Serial Port (USB)" | head -n1 | awk '{print $$1}')
 RX_PORT ?= $(shell arduino-cli board list | grep "Serial Port (USB)" | tail -n1 | awk '{print $$1}')
@@ -40,7 +43,13 @@ help:
 	@echo "  wifi-upload-transmitter - Upload transmitter (WiFi mode)"
 	@echo "  wifi-upload-receiver    - Upload receiver (WiFi mode)"
 	@echo ""
-	@echo "Example usage:"
+	@echo "Compact Build Targets (XIAO ESP32-C3 + DRV8833):"
+	@echo "  compact-compile         - Compile compact receiver for XIAO"
+	@echo "  compact-upload          - Upload compact receiver to XIAO"
+	@echo "  compact-all             - Compile TX + compact RX, upload both"
+	@echo "  compact-wifi-compile    - Compile compact receiver (WiFi mode)"
+	@echo ""
+	@echo "Example usage:
 	@echo "  make install-libs"
 	@echo "  make all                # BLE mode (default)"
 	@echo "  make wifi-all           # WiFi mode"
@@ -156,3 +165,35 @@ clean:
 
 verify: compile
 	@echo "Verification complete - both sketches compiled successfully!"
+
+# ========================================
+# Compact Build Targets (XIAO ESP32-C3 + DRV8833)
+# ========================================
+# For miniaturized receiver build using:
+# - Seeed XIAO ESP32-C3 (21x17mm)
+# - DRV8833 motor driver (replaces MX1508)
+# - Same TX (ESP32-C3 Super Mini)
+
+compact-compile:
+	@echo "Compiling compact receiver (XIAO + DRV8833)..."
+	$(ARDUINO_CLI) compile --fqbn $(XIAO_FQBN) $(RX_COMPACT_SKETCH)
+
+compact-upload: compact-compile
+	@echo "Detected RX port: $(RX_PORT)"
+	@echo "Uploading compact receiver to $(RX_PORT)..."
+	$(ARDUINO_CLI) upload -p $(RX_PORT) --fqbn $(XIAO_FQBN) $(RX_COMPACT_SKETCH)
+
+compact-all: compile-transmitter compact-compile upload-transmitter compact-upload
+	@echo "Compact build complete (TX + compact RX)!"
+
+compact-wifi-compile:
+	@echo "Compiling compact receiver (WiFi mode)..."
+	$(ARDUINO_CLI) compile --fqbn $(XIAO_FQBN) --build-property "compiler.cpp.extra_flags=-DUSE_WIFI" $(RX_COMPACT_SKETCH)
+
+compact-wifi-upload: compact-wifi-compile
+	@echo "Uploading compact receiver (WiFi mode) to $(RX_PORT)..."
+	$(ARDUINO_CLI) upload -p $(RX_PORT) --fqbn $(XIAO_FQBN) $(RX_COMPACT_SKETCH)
+
+compact-monitor:
+	@echo "Opening serial monitor for compact receiver on $(RX_PORT)..."
+	$(ARDUINO_CLI) monitor -p $(RX_PORT) -c baudrate=115200

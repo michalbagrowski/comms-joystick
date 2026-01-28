@@ -117,8 +117,11 @@ See `WIRING.md` for battery circuit diagrams.
 
 ## Documentation
 
+- `BOM.md` - **Bill of Materials** (components & pricing)
 - `WIRING.md` - Complete wiring guide with diagrams
+- `COMPACT_BUILD.md` - Miniaturized RX build guide (Hot Wheels size)
 - `diagrams/` - SVG wiring schematics (TX, RX, battery circuits)
+- `enclosure/` - 3D printable case designs (OpenSCAD)
 - `WIFI_SETUP.md` - WiFi mode configuration
 - `HARDWARE_FILTERING.md` - ADC noise filtering
 - `CLAUDE.md` - Technical reference
@@ -139,11 +142,19 @@ See `WIRING.md` for battery circuit diagrams.
 ## Make Commands
 
 ```bash
+# Standard build (ESP32-C3 Super Mini)
 make all                 # Compile + upload both (BLE)
 make wifi-all            # Compile + upload both (WiFi)
 make compile             # Compile only
 make upload-transmitter  # Upload TX
 make upload-receiver     # Upload RX
+
+# Compact build (XIAO ESP32-C3 + DRV8833)
+make compact-all         # Compile TX + compact RX, upload both
+make compact-compile     # Compile compact RX only
+make compact-upload      # Upload compact RX
+
+# Utilities
 make list-ports          # Show connected boards
 make monitor-transmitter # Serial monitor TX
 make install-libs        # Install libraries
@@ -152,18 +163,24 @@ make install-libs        # Install libraries
 ## Project Structure
 
 ```
-├── transmitter/transmitter.ino  # TX code
-├── receiver/receiver.ino        # RX code
-├── Makefile                     # Build system
-├── diagrams/                    # SVG wiring schematics
+├── transmitter/transmitter.ino    # TX code (standard)
+├── receiver/receiver.ino          # RX code (standard)
+├── receiver_compact/              # RX code (miniaturized)
+│   └── receiver_compact.ino       # XIAO ESP32-C3 + DRV8833
+├── Makefile                       # Build system
+├── diagrams/                      # SVG wiring schematics
 │   ├── tx-wiring.svg
 │   ├── rx-wiring.svg
+│   ├── rx-compact-wiring.svg      # Compact build wiring
 │   ├── motor-enable-circuit.svg
 │   ├── battery-voltage-divider.svg
 │   ├── tx-lipo-power.svg
 │   └── rx-lipo-power.svg
-├── WIRING.md                    # Wiring guide
-├── WIFI_SETUP.md                # WiFi configuration
-├── HARDWARE_FILTERING.md        # ADC filtering
-└── CLAUDE.md                    # Technical reference
+├── enclosure/                     # 3D printable cases
+│   └── compact_rx_case.scad       # OpenSCAD parametric design
+├── WIRING.md                      # Standard wiring guide
+├── COMPACT_BUILD.md               # Miniaturized build guide
+├── WIFI_SETUP.md                  # WiFi configuration
+├── HARDWARE_FILTERING.md          # ADC filtering
+└── CLAUDE.md                      # Technical reference
 ```
