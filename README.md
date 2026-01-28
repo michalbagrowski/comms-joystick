@@ -118,6 +118,7 @@ See `WIRING.md` for battery circuit diagrams.
 ## Documentation
 
 - `WIRING.md` - Complete wiring guide with diagrams
+- `diagrams/` - SVG wiring schematics (TX, RX, battery circuits)
 - `WIFI_SETUP.md` - WiFi mode configuration
 - `HARDWARE_FILTERING.md` - ADC noise filtering
 - `CLAUDE.md` - Technical reference
@@ -154,6 +155,13 @@ make install-libs        # Install libraries
 ├── transmitter/transmitter.ino  # TX code
 ├── receiver/receiver.ino        # RX code
 ├── Makefile                     # Build system
+├── diagrams/                    # SVG wiring schematics
+│   ├── tx-wiring.svg
+│   ├── rx-wiring.svg
+│   ├── motor-enable-circuit.svg
+│   ├── battery-voltage-divider.svg
+│   ├── tx-lipo-power.svg
+│   └── rx-lipo-power.svg
 ├── WIRING.md                    # Wiring guide
 ├── WIFI_SETUP.md                # WiFi configuration
 ├── HARDWARE_FILTERING.md        # ADC filtering

@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="600" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">Receiver (RX) Wiring Diagram</text>
+
+  <!-- ESP32-C3 Board -->
+  <rect x="350" y="100" width="200" height="320" rx="8" fill="#2d5a27" stroke="#1a3a17" stroke-width="2"/>
+  <text x="450" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">ESP32-C3</text>
+  <text x="450" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#aaffaa">Super Mini</text>
+
+  <!-- ESP32 Pins Left Side -->
+  <g font-family="monospace" font-size="11" fill="white">
+    <rect x="355" y="170" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="183" text-anchor="middle">GPIO0</text>
+    <rect x="355" y="195" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="208" text-anchor="middle">GPIO1</text>
+    <rect x="355" y="220" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="233" text-anchor="middle">GPIO2</text>
+    <rect x="355" y="245" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="258" text-anchor="middle">GPIO3</text>
+    <rect x="355" y="270" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="283" text-anchor="middle">GPIO4</text>
+    <rect x="355" y="295" width="60" height="18" rx="2" fill="#e67e22"/>
+    <text x="385" y="308" text-anchor="middle">GPIO5</text>
+    <rect x="355" y="320" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="333" text-anchor="middle">GPIO6</text>
+    <rect x="355" y="345" width="60" height="18" rx="2" fill="#444"/>
+    <text x="385" y="358" text-anchor="middle">GPIO7</text>
+  </g>
+
+  <!-- ESP32 Pins Right Side -->
+  <g font-family="monospace" font-size="11" fill="white">
+    <rect x="485" y="170" width="60" height="18" rx="2" fill="#c41e3a"/>
+    <text x="515" y="183" text-anchor="middle">5V</text>
+    <rect x="485" y="195" width="60" height="18" rx="2" fill="#8e44ad"/>
+    <text x="515" y="208" text-anchor="middle">3.3V</text>
+    <rect x="485" y="220" width="60" height="18" rx="2" fill="#333"/>
+    <text x="515" y="233" text-anchor="middle">GND</text>
+    <rect x="485" y="270" width="60" height="18" rx="2" fill="#444"/>
+    <text x="515" y="283" text-anchor="middle">GPIO10</text>
+  </g>
+
+  <!-- MX1508 Motor Driver -->
+  <rect x="50" y="130" width="150" height="180" rx="8" fill="#8e44ad" stroke="#6c3483" stroke-width="2"/>
+  <text x="125" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">MX1508</text>
+  <text x="125" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#d7bde2">Motor Driver</text>
+
+  <!-- MX1508 Input Pins -->
+  <g font-family="monospace" font-size="9" fill="white">
+    <rect x="160" y="185" width="35" height="16" rx="2" fill="#555"/>
+    <text x="177" y="196" text-anchor="middle">IN1</text>
+    <rect x="160" y="205" width="35" height="16" rx="2" fill="#555"/>
+    <text x="177" y="216" text-anchor="middle">IN2</text>
+    <rect x="160" y="225" width="35" height="16" rx="2" fill="#555"/>
+    <text x="177" y="236" text-anchor="middle">IN3</text>
+    <rect x="160" y="245" width="35" height="16" rx="2" fill="#555"/>
+    <text x="177" y="256" text-anchor="middle">IN4</text>
+    <rect x="160" y="270" width="35" height="16" rx="2" fill="#c41e3a"/>
+    <text x="177" y="281" text-anchor="middle">VCC</text>
+    <rect x="160" y="290" width="35" height="16" rx="2" fill="#333"/>
+    <text x="177" y="301" text-anchor="middle">GND</text>
+  </g>
+
+  <!-- MX1508 Output Pins -->
+  <g font-family="monospace" font-size="9" fill="white">
+    <rect x="55" y="185" width="40" height="16" rx="2" fill="#27ae60"/>
+    <text x="75" y="196" text-anchor="middle">OUT1</text>
+    <rect x="55" y="205" width="40" height="16" rx="2" fill="#27ae60"/>
+    <text x="75" y="216" text-anchor="middle">OUT2</text>
+    <rect x="55" y="235" width="40" height="16" rx="2" fill="#3498db"/>
+    <text x="75" y="246" text-anchor="middle">OUT3</text>
+    <rect x="55" y="255" width="40" height="16" rx="2" fill="#3498db"/>
+    <text x="75" y="266" text-anchor="middle">OUT4</text>
+  </g>
+
+  <!-- Motor 1 -->
+  <g transform="translate(50, 330)">
+    <ellipse cx="40" cy="30" rx="35" ry="25" fill="#555" stroke="#333" stroke-width="2"/>
+    <rect x="70" y="20" width="15" height="20" fill="#777"/>
+    <text x="40" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="white">M1</text>
+    <text x="40" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666">Motor 1</text>
+  </g>
+
+  <!-- Motor 2 -->
+  <g transform="translate(130, 330)">
+    <ellipse cx="40" cy="30" rx="35" ry="25" fill="#555" stroke="#333" stroke-width="2"/>
+    <rect x="70" y="20" width="15" height="20" fill="#777"/>
+    <text x="40" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="white">M2</text>
+    <text x="40" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666">Motor 2</text>
+  </g>
+
+  <!-- Servo -->
+  <rect x="700" y="130" width="100" height="80" rx="5" fill="#e67e22" stroke="#d35400" stroke-width="2"/>
+  <text x="750" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">SG90</text>
+  <text x="750" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#fdebd0">Servo</text>
+  <rect x="720" y="180" width="60" height="8" fill="#f39c12"/>
+  <g font-family="monospace" font-size="8" fill="white">
+    <text x="715" y="200">GND</text>
+    <text x="740" y="200">VCC</text>
+    <text x="765" y="200">SIG</text>
+  </g>
+
+  <!-- OLED Display -->
+  <rect x="700" y="250" width="120" height="90" rx="8" fill="#1a1a2e" stroke="#0f0f1a" stroke-width="2"/>
+  <rect x="715" y="265" width="90" height="45" rx="4" fill="#000" stroke="#333"/>
+  <text x="760" y="293" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00ff00">128x64 OLED</text>
+  <text x="760" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333">1.3" SSD1306</text>
+  <g font-family="monospace" font-size="8" fill="white">
+    <text x="715" y="330">VCC</text>
+    <text x="740" y="330">GND</text>
+    <text x="770" y="330">SCL</text>
+    <text x="800" y="330">SDA</text>
+  </g>
+
+  <!-- 2N2222 Transistor Circuit -->
+  <g transform="translate(230, 420)">
+    <rect x="0" y="0" width="180" height="120" rx="8" fill="#fff3cd" stroke="#ffc107" stroke-width="2"/>
+    <text x="90" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#856404">Motor Enable Circuit</text>
+
+    <!-- Transistor Symbol -->
+    <circle cx="90" cy="70" r="25" fill="none" stroke="#333" stroke-width="2"/>
+    <line x1="65" y1="70" x2="80" y2="70" stroke="#333" stroke-width="2"/>
+    <line x1="80" y1="55" x2="80" y2="85" stroke="#333" stroke-width="2"/>
+    <line x1="80" y1="60" x2="105" y2="45" stroke="#333" stroke-width="2"/>
+    <line x1="80" y1="80" x2="105" y2="95" stroke="#333" stroke-width="2"/>
+    <polygon points="100,48 105,45 100,52" fill="#333"/>
+
+    <!-- Labels -->
+    <text x="50" y="74" font-family="Arial" font-size="9" fill="#333">B</text>
+    <text x="108" y="45" font-family="Arial" font-size="9" fill="#333">C</text>
+    <text x="108" y="100" font-family="Arial" font-size="9" fill="#333">E</text>
+    <text x="90" y="110" text-anchor="middle" font-family="Arial" font-size="9" fill="#666">2N2222</text>
+
+    <!-- Resistor -->
+    <path d="M 20 70 L 30 70 L 33 60 L 39 80 L 45 60 L 51 80 L 57 60 L 60 70 L 65 70" fill="none" stroke="#333" stroke-width="1.5"/>
+    <text x="40" y="55" font-family="Arial" font-size="8" fill="#333">1K</text>
+  </g>
+
+  <!-- Connection Lines - Motor Driver Inputs -->
+  <g stroke="#e74c3c" stroke-width="2" fill="none">
+    <path d="M 355 179 L 280 179 L 280 193 L 195 193"/>
+    <path d="M 355 204 L 270 204 L 270 213 L 195 213"/>
+    <path d="M 355 229 L 260 229 L 260 233 L 195 233"/>
+    <path d="M 355 254 L 250 254 L 250 253 L 195 253"/>
+  </g>
+
+  <!-- Connection Lines - 5V Power -->
+  <g stroke="#c41e3a" stroke-width="2" fill="none" stroke-dasharray="5,3">
+    <path d="M 545 179 L 600 179 L 600 100 L 177 100 L 177 130"/>
+    <path d="M 600 179 L 650 179 L 650 188 L 700 188"/>
+  </g>
+
+  <!-- Connection Lines - 3.3V Power -->
+  <g stroke="#8e44ad" stroke-width="2" fill="none" stroke-dasharray="5,3">
+    <path d="M 545 204 L 620 204 L 620 318 L 700 318"/>
+  </g>
+
+  <!-- Connection Lines - GND -->
+  <g stroke="#333" stroke-width="2" fill="none">
+    <path d="M 545 229 L 640 229 L 640 110 L 720 110 L 720 130"/>
+    <path d="M 640 229 L 640 318 L 700 318"/>
+    <path d="M 335 540 L 335 510 L 545 510 L 545 229"/>
+  </g>
+
+  <!-- Servo Signal -->
+  <g stroke="#f39c12" stroke-width="2" fill="none">
+    <path d="M 355 279 L 300 279 L 300 110 L 780 110 L 780 130"/>
+  </g>
+
+  <!-- Display I2C Lines -->
+  <g stroke="#27ae60" stroke-width="2" fill="none">
+    <path d="M 355 329 L 330 329 L 330 395 L 660 395 L 660 318 L 700 318"/>
+  </g>
+  <g stroke="#f39c12" stroke-width="2" fill="none">
+    <path d="M 355 354 L 340 354 L 340 405 L 670 405 L 670 318 L 700 318"/>
+  </g>
+
+  <!-- Motor Enable Line -->
+  <g stroke="#e67e22" stroke-width="2" fill="none">
+    <path d="M 355 304 L 320 304 L 320 490 L 250 490"/>
+  </g>
+
+  <!-- Transistor to MX1508 GND -->
+  <g stroke="#333" stroke-width="2" fill="none">
+    <path d="M 320 465 L 320 430 L 200 430 L 200 298 L 195 298"/>
+  </g>
+
+  <!-- Motor Connections -->
+  <g stroke="#27ae60" stroke-width="2" fill="none">
+    <path d="M 55 193 L 30 193 L 30 350 L 55 350"/>
+    <path d="M 55 213 L 40 213 L 40 360 L 85 360"/>
+  </g>
+  <g stroke="#3498db" stroke-width="2" fill="none">
+    <path d="M 55 243 L 20 243 L 20 370 L 135 370 L 135 360"/>
+    <path d="M 55 263 L 10 263 L 10 380 L 175 380 L 175 360"/>
+  </g>
+
+  <!-- Legend -->
+  <rect x="700" y="400" width="180" height="140" rx="5" fill="white" stroke="#ccc"/>
+  <text x="790" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#333">Legend</text>
+  <line x1="710" y1="435" x2="740" y2="435" stroke="#c41e3a" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="750" y="439" font-family="Arial" font-size="9" fill="#333">5V Power</text>
+  <line x1="710" y1="455" x2="740" y2="455" stroke="#8e44ad" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="750" y="459" font-family="Arial" font-size="9" fill="#333">3.3V Power</text>
+  <line x1="710" y1="475" x2="740" y2="475" stroke="#333" stroke-width="2"/>
+  <text x="750" y="479" font-family="Arial" font-size="9" fill="#333">Ground</text>
+  <line x1="710" y1="495" x2="740" y2="495" stroke="#e74c3c" stroke-width="2"/>
+  <text x="750" y="499" font-family="Arial" font-size="9" fill="#333">Motor PWM</text>
+  <line x1="710" y1="515" x2="740" y2="515" stroke="#e67e22" stroke-width="2"/>
+  <text x="750" y="519" font-family="Arial" font-size="9" fill="#333">Motor Enable</text>
+  <line x1="710" y1="530" x2="740" y2="530" stroke="#f39c12" stroke-width="2"/>
+  <text x="750" y="534" font-family="Arial" font-size="9" fill="#333">Signal/SDA</text>
+
+  <!-- Notes -->
+  <text x="450" y="580" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#666">Motor enable circuit prevents motor twitch during boot. GPIO5 HIGH = motors enabled.</text>
+</svg>

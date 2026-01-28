@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380">
+  <!-- Background -->
+  <rect width="600" height="380" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="300" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#333">TX LiPo Power Circuit (Simple)</text>
+  <text x="300" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666">Direct connection - ESP32 regulator handles 3.7V input</text>
+
+  <!-- Main Circuit Area -->
+  <rect x="40" y="70" width="520" height="220" rx="10" fill="white" stroke="#ddd" stroke-width="2"/>
+
+  <!-- LiPo Battery -->
+  <g transform="translate(60, 100)">
+    <rect x="0" y="0" width="80" height="130" rx="5" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <rect x="25" y="-10" width="30" height="12" rx="2" fill="#2980b9"/>
+    <text x="40" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">LiPo</text>
+    <text x="40" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d6eaf8">1S 3.7V</text>
+    <text x="40" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#d6eaf8">500-</text>
+    <text x="40" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#d6eaf8">1000mAh</text>
+
+    <!-- Battery terminals -->
+    <rect x="60" y="30" width="25" height="18" rx="2" fill="#c41e3a"/>
+    <text x="72" y="43" text-anchor="middle" font-family="Arial" font-size="10" fill="white">+</text>
+    <rect x="60" y="80" width="25" height="18" rx="2" fill="#333"/>
+    <text x="72" y="93" text-anchor="middle" font-family="Arial" font-size="10" fill="white">-</text>
+  </g>
+
+  <!-- Capacitors -->
+  <g transform="translate(180, 130)">
+    <rect x="0" y="0" width="70" height="60" rx="3" fill="#e8f8f5" stroke="#1abc9c" stroke-width="1"/>
+    <text x="35" y="15" text-anchor="middle" font-family="Arial" font-size="9" fill="#16a085">Decoupling</text>
+
+    <!-- Electrolytic -->
+    <line x1="18" y1="25" x2="18" y2="50" stroke="#333" stroke-width="2"/>
+    <rect x="13" y="32" width="10" height="8" fill="none" stroke="#333" stroke-width="1"/>
+    <text x="18" y="62" text-anchor="middle" font-family="Arial" font-size="7" fill="#333">100µF</text>
+
+    <!-- Ceramic -->
+    <line x1="52" y1="25" x2="52" y2="50" stroke="#333" stroke-width="2"/>
+    <line x1="47" y1="35" x2="57" y2="35" stroke="#333" stroke-width="2"/>
+    <line x1="47" y1="40" x2="57" y2="40" stroke="#333" stroke-width="2"/>
+    <text x="52" y="62" text-anchor="middle" font-family="Arial" font-size="7" fill="#333">0.1µF</text>
+  </g>
+
+  <!-- Voltage Divider -->
+  <g transform="translate(280, 110)">
+    <rect x="0" y="0" width="80" height="100" rx="5" fill="#fef5e7" stroke="#f39c12" stroke-width="1"/>
+    <text x="40" y="18" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold" fill="#d68910">VBAT Sense</text>
+
+    <!-- R1 -->
+    <rect x="30" y="30" width="10" height="25" fill="#d4a574" stroke="#8b6914"/>
+    <text x="55" y="47" font-family="Arial" font-size="8" fill="#333">R1: 10K</text>
+
+    <!-- Junction point -->
+    <circle cx="35" cy="60" r="4" fill="#f39c12"/>
+
+    <!-- R2 -->
+    <rect x="30" y="65" width="10" height="25" fill="#d4a574" stroke="#8b6914"/>
+    <text x="55" y="82" font-family="Arial" font-size="8" fill="#333">R2: 10K</text>
+  </g>
+
+  <!-- ESP32 -->
+  <rect x="400" y="100" width="140" height="150" rx="5" fill="#2d5a27" stroke="#1a3a17" stroke-width="2"/>
+  <text x="470" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">ESP32-C3</text>
+  <text x="470" y="142" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#aaffaa">Super Mini</text>
+
+  <g font-family="monospace" font-size="10" fill="white">
+    <rect x="405" y="155" width="55" height="18" rx="2" fill="#8e44ad"/>
+    <text x="432" y="168" text-anchor="middle">3.3V/VIN</text>
+    <rect x="405" y="180" width="45" height="18" rx="2" fill="#333"/>
+    <text x="427" y="193" text-anchor="middle">GND</text>
+    <rect x="405" y="210" width="55" height="18" rx="2" fill="#f39c12"/>
+    <text x="432" y="223" text-anchor="middle">GPIO10</text>
+  </g>
+
+  <!-- Wiring -->
+  <!-- Battery + to ESP32 VIN and voltage divider -->
+  <line x1="145" y1="138" x2="170" y2="138" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="170" y1="138" x2="170" y2="100" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="170" y1="100" x2="380" y2="100" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="380" y1="100" x2="380" y2="164" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="380" y1="164" x2="405" y2="164" stroke="#c41e3a" stroke-width="3"/>
+  <circle cx="170" cy="138" r="4" fill="#c41e3a"/>
+
+  <!-- Battery + to voltage divider R1 -->
+  <line x1="170" y1="138" x2="295" y2="138" stroke="#c41e3a" stroke-width="2"/>
+  <line x1="295" y1="138" x2="295" y2="140" stroke="#c41e3a" stroke-width="2"/>
+
+  <!-- Voltage divider junction to GPIO10 -->
+  <line x1="320" y1="170" x2="365" y2="170" stroke="#f39c12" stroke-width="2"/>
+  <line x1="365" y1="170" x2="365" y2="219" stroke="#f39c12" stroke-width="2"/>
+  <line x1="365" y1="219" x2="405" y2="219" stroke="#f39c12" stroke-width="2"/>
+
+  <!-- GND connections -->
+  <line x1="145" y1="188" x2="170" y2="188" stroke="#333" stroke-width="3"/>
+  <line x1="170" y1="188" x2="170" y2="270" stroke="#333" stroke-width="3"/>
+  <line x1="170" y1="270" x2="427" y2="270" stroke="#333" stroke-width="3"/>
+  <line x1="295" y1="200" x2="295" y2="270" stroke="#333" stroke-width="2"/>
+  <line x1="427" y1="198" x2="427" y2="270" stroke="#333" stroke-width="2"/>
+  <circle cx="170" cy="270" r="4" fill="#333"/>
+  <circle cx="295" cy="270" r="4" fill="#333"/>
+  <circle cx="427" cy="270" r="4" fill="#333"/>
+
+  <!-- Capacitor connections -->
+  <line x1="170" y1="138" x2="170" y2="160" stroke="#c41e3a" stroke-width="2"/>
+  <line x1="170" y1="160" x2="180" y2="160" stroke="#c41e3a" stroke-width="2"/>
+  <line x1="170" y1="188" x2="180" y2="188" stroke="#333" stroke-width="2"/>
+
+  <!-- GND Symbol -->
+  <g transform="translate(290, 270)">
+    <line x1="0" y1="0" x2="0" y2="12" stroke="#333" stroke-width="3"/>
+    <line x1="-12" y1="12" x2="12" y2="12" stroke="#333" stroke-width="3"/>
+    <line x1="-8" y1="17" x2="8" y2="17" stroke="#333" stroke-width="2"/>
+    <line x1="-4" y1="22" x2="4" y2="22" stroke="#333" stroke-width="1"/>
+  </g>
+
+  <!-- Labels -->
+  <text x="175" y="93" font-family="Arial" font-size="9" fill="#c41e3a">3.0-4.2V</text>
+  <text x="350" y="165" font-family="Arial" font-size="8" fill="#f39c12">2.1V max</text>
+
+  <!-- Notes -->
+  <rect x="40" y="300" width="520" height="70" rx="5" fill="#e8f5e9" stroke="#4caf50" stroke-width="1"/>
+  <text x="300" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#2e7d32">Notes:</text>
+  <text x="300" y="338" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333">TX has no 5V components, so LiPo can power ESP32 directly</text>
+  <text x="300" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333">ESP32's internal 3.3V regulator accepts 3.0-6.0V input</text>
+</svg>

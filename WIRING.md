@@ -5,6 +5,21 @@
 
 ---
 
+## Wiring Diagrams
+
+SVG diagrams are available in the `diagrams/` folder for better visualization:
+
+| Diagram | Description |
+|---------|-------------|
+| [tx-wiring.svg](diagrams/tx-wiring.svg) | Complete TX wiring overview |
+| [rx-wiring.svg](diagrams/rx-wiring.svg) | Complete RX wiring with motor enable circuit |
+| [motor-enable-circuit.svg](diagrams/motor-enable-circuit.svg) | 2N2222 transistor motor enable circuit |
+| [battery-voltage-divider.svg](diagrams/battery-voltage-divider.svg) | Battery monitoring voltage divider |
+| [tx-lipo-power.svg](diagrams/tx-lipo-power.svg) | TX LiPo battery power circuit |
+| [rx-lipo-power.svg](diagrams/rx-lipo-power.svg) | RX LiPo battery with boost converter |
+
+---
+
 ## Quick Reference
 
 | Board | Display | Actuators | Joysticks | Communication |
@@ -139,35 +154,9 @@ This provides:
 
 ## TX: Complete Wiring Diagram
 
-```
-                        ┌─────────────────────────┐
-                        │   ESP32-C3 SUPER MINI   │
-                        │                         │
-   Joystick 1           │  GPIO0  GPIO3           │  Joystick 2
-   ┌────────┐           │  GPIO1  GPIO4           │  ┌────────┐
-   │  ○     │  VRx  ────┤  GPIO2  GPIO5           ├──│     ○  │
-   │ /│\    │  VRy  ────┤                         │  │    /│\ │
-   │  │     │  SW   ────┤  GPIO6  GPIO7           │  │     │  │
-   │        │  VCC  ────┤                         │  │        │
-   └────────┘  GND  ────┤  3.3V   GND             ├──└────────┘
-                        │                         │
-                        │  GPIO8 (LED)            │  ← Blinks
-                        │                         │
-                        │  GPIO6 ──────┐          │
-      1.9" OLED         │  GPIO7 ──────┼──┐       │
-      ┌──────────┐      │         ┌────┼──┼───┐   │
-      │ 128x64   │  SDA ├─────────┤    │  │   │   │
-      │  OLED    │  SCL ├─────────┤    │  │   │   │
-      │          │  VCC ├─────────┤ 3.3V│  │   │   │
-      └──────────┘  GND ├─────────┤ GND │  │   │   │
-                        │         └────┼──┼───┘   │
-                        │              │  │       │
-                        │         USB-C│          │
-                        └──────────────┼──────────┘
-                                       │
-                                   Computer/
-                                   Power Supply
-```
+![TX Wiring Diagram](diagrams/tx-wiring.svg)
+
+*See [diagrams/tx-wiring.svg](diagrams/tx-wiring.svg) for full-size diagram*
 
 ## TX: Wiring Checklist
 
@@ -334,73 +323,23 @@ IN4 (Motor 2 reverse) →   GPIO3
 
 The ESP32 bootloader can drive GPIO pins during boot, causing motor movement even with pull-down resistors. This circuit cuts power to the MX1508 until your code enables it.
 
+![Motor Enable Circuit](diagrams/motor-enable-circuit.svg)
+
+*See [diagrams/motor-enable-circuit.svg](diagrams/motor-enable-circuit.svg) for detailed schematic*
+
 **Components needed:**
 - 1x 2N2222 NPN transistor (or similar: 2N3904, BC547, etc.)
 - 1x 1K resistor
 
+**Wiring Summary:**
+| 2N2222 Pin | Connection |
+|------------|------------|
+| Base (B) | 1K resistor → GPIO5 |
+| Collector (C) | MX1508 GND pin |
+| Emitter (E) | ESP32 GND |
+
 **How it works:**
-- Transistor acts as a switch for MX1508's ground connection
-- GPIO5 LOW (default at boot) = transistor OFF = MX1508 has no ground = motors can't run
-- GPIO5 HIGH (set by code after init) = transistor ON = MX1508 works normally
-
-**Wiring:**
-```
-2N2222 Transistor              Connections
-─────────────────              ───────────
-Base (B)                   →   1K resistor → GPIO5
-Collector (C)              →   MX1508 GND pin
-Emitter (E)                →   ESP32 GND
-```
-
-**2N2222 Pinout (flat side facing you):**
-```
-      ┌───────┐
-      │       │
-      │ 2N2222│
-      │       │
-      └─┬─┬─┬─┘
-        │ │ │
-        E B C
-        │ │ │
-        │ │ └── Collector → MX1508 GND
-        │ └──── Base → [1K resistor] → GPIO5
-        └────── Emitter → ESP32 GND
-```
-
-**Schematic:**
-```
-                                    +5V
-                                     │
-                              ┌──────┴──────┐
-                              │   MX1508    │
-                              │   VCC       │
-                              │             │
-                              │   GND       │
-                              └──────┬──────┘
-                                     │
-                                Collector (C)
-                                   ┌─┴─┐
-         GPIO5 ────[1K]──── Base ──┤NPN├── 2N2222
-                                   └─┬─┘
-                                Emitter (E)
-                                     │
-                                    GND
-```
-
-**Breadboard Layout:**
-```
-     ESP32                 Transistor           MX1508
-    ┌─────┐               ┌─────────┐         ┌──────┐
-    │GPIO5├───[1K]────────┤ B       │         │ VCC  ├── 5V
-    │     │               │   2N2222│         │      │
-    │ GND ├───────────────┤ E       │    ┌────┤ GND  │
-    └─────┘               │         ├────┘    └──────┘
-                          │ C       │
-                          └─────────┘
-```
-
-**Why this works:**
-- At boot: GPIO5 is LOW (default) → transistor OFF → MX1508 GND disconnected → no current can flow → motors stay still
+- At boot: GPIO5 is LOW (default) → transistor OFF → MX1508 GND disconnected → motors stay still
 - After setup(): Code sets GPIO5 HIGH → transistor ON → MX1508 GND connected → normal operation
 - On reset: GPIO5 goes LOW again → motors stop immediately
 
@@ -458,59 +397,11 @@ USB-C Cable → ESP32-C3 USB-C port
 
 ## RX: Complete Wiring Diagram
 
-```
-                        ┌─────────────────────────┐
-                        │   ESP32-C3 SUPER MINI   │
-                        │                         │
-      1.3" SH1106       │  GPIO6 ──────┐          │
-      ┌──────────┐      │  GPIO7 ──────┼──┐       │
-      │ 128x64   │  SDA ├─────────┤    │  │       │
-      │  OLED    │  SCL ├─────────┤    │  │       │
-      │          │  VCC ├─────────┤ 3.3V│  │       │
-      └──────────┘  GND ├─────────┤ GND─┼──┼───┐   │
-                        │         └────┼──┼───┼───┤
-                        │              │  │   │   │
-                        │  GPIO0 ──────────────┼──┤ IN1
-      MX1508            │  GPIO1 ──────────────┼──┤ IN2
-      ┌──────────┐      │  GPIO2 ──────────────┼──┤ IN3
-      │  MOTOR   │  IN4 ├  GPIO3 ──────────────┼──┤ IN4
-      │  DRIVER  │      │                      │  │
-      │          │  VCC ├──────────5V──────────┤  │
-      │          │      │                      │  │
-      │          │  GND ├──────┐               │  │
-      │          │      │      │               │  │
-      │ OUT1 OUT2│      │   Collector (C)      │  │
-      │  │    │  │      │      │               │  │
-      └──┼────┼──┘      │    ┌─┴─┐             │  │
-         │    │         │    │NPN│ 2N2222      │  │
-      ┌──┴────┴──┐      │    └─┬─┘             │  │
-      │  Motor 1 │      │ Base │               │  │
-      └──────────┘      │   ┌──┴──┐            │  │
-                        │   │ [1K]│            │  │
-         Motor 2        │   └──┬──┘            │  │
-         connects       │      │               │  │
-         to OUT3/OUT4   │  GPIO5               │  │
-                        │                      │  │
-                        │  Emitter (E)         │  │
-                        │      │               │  │
-                        │     GND──────────────┘  │
-                        │                         │
-                        │  5V    GND              │
-                        └──────┬───┬──────────────┘
-                               │   │
-                          [1000µF Cap] (optional)
-                               │   │
-                           Power Supply
-                            (5V 2A+)
+![RX Wiring Diagram](diagrams/rx-wiring.svg)
 
-    MOTOR ENABLE CIRCUIT:
-    ─────────────────────
-    GPIO5 ──[1K]──┬── 2N2222 Base
-                  │
-    MX1508 GND ───┴── 2N2222 Collector
-                  │
-    ESP32 GND ────┴── 2N2222 Emitter
-```
+*See [diagrams/rx-wiring.svg](diagrams/rx-wiring.svg) for full-size diagram*
+
+For motor enable circuit details, see [diagrams/motor-enable-circuit.svg](diagrams/motor-enable-circuit.svg)
 
 ## RX: Wiring Checklist
 
@@ -574,54 +465,15 @@ Both boards can run on single-cell LiPo batteries (3.7V nominal) for portable op
 
 ### TX Battery Wiring
 
-**Voltage Divider Circuit:**
-```
-LiPo (+) ────┬──────────────────────► ESP32 3.3V/VIN
-             │
-            [10K]  R1
-             │
-             ├──────────────────────► GPIO10 (ADC)
-             │
-            [10K]  R2
-             │
-LiPo (-) ────┴──────────────────────► ESP32 GND
-```
+![TX LiPo Power Circuit](diagrams/tx-lipo-power.svg)
 
-**Complete TX LiPo Circuit:**
-```
-                    ┌─────────────────────────┐
-                    │   ESP32-C3 SUPER MINI   │
-                    │                         │
-   LiPo Battery     │                         │
-   ┌─────────┐      │  3.3V ◄── LiPo (+)      │
-   │ ═══════ │──(+)─┤                         │
-   │  3.7V   │      │  GND ◄── LiPo (-)       │
-   │ ═══════ │──(-)─┤                         │
-   └─────────┘      │                         │
-        │           │  GPIO10 ◄── VBAT sense  │
-        │           │      │                  │
-        │           └──────┼──────────────────┘
-        │                  │
-        │    Voltage       │
-        │    Divider:      │
-        │                  │
-        └──(+)──[10K]──┬───┘
-                       │
-                      [10K]
-                       │
-        └──(-)─────────┘
-```
+*See [diagrams/tx-lipo-power.svg](diagrams/tx-lipo-power.svg) for detailed schematic*
 
-**Decoupling Capacitors (add close to ESP32):**
-```
-LiPo (+) ────┬──[100µF]──┬── ESP32 3.3V/VIN
-             │           │
-             └─[0.1µF]───┘
-                  │
-LiPo (-) ─────────┴─────────── ESP32 GND
-```
+![Battery Voltage Divider](diagrams/battery-voltage-divider.svg)
 
-**Why voltage divider:**
+*See [diagrams/battery-voltage-divider.svg](diagrams/battery-voltage-divider.svg) for voltage divider details*
+
+**Voltage divider explained:**
 - LiPo outputs 3.0-4.2V
 - ESP32 ADC max input: 3.3V
 - Divider ratio: 10K/(10K+10K) = 0.5
@@ -664,72 +516,14 @@ The servo (SG90) requires 5V to operate properly. LiPo provides 3.7V, so you nee
 
 ### RX Battery Wiring
 
-**Power Distribution:**
-```
-                                ┌──────────────────┐
-                                │  MT3608 Boost    │
-                                │  Converter       │
-LiPo (+) ───┬───────────────────┤ VIN+      VOUT+ ├───► 5V (Servo, MX1508)
-            │                   │                  │
-            │                   │ VIN-      VOUT- ├───► GND
-            │                   └────────┬─────────┘
-            │                            │
-            └───────────────────┬────────┘
-                                │
-                            ESP32 VIN/3.3V
-                                │
-LiPo (-) ───────────────────────┴──────────────────► GND (all)
-```
+![RX LiPo Power Circuit](diagrams/rx-lipo-power.svg)
 
-**Complete RX LiPo Circuit:**
-```
-   LiPo Battery                    MT3608 Boost
-   ┌─────────┐                    ┌───────────┐
-   │ ═══════ │──(+)──┬────────────┤VIN+  VOUT+├──► 5V (Servo VCC)
-   │ 1000mAh │       │            │           │      (MX1508 VCC)
-   │  3.7V   │       │            │VIN-  VOUT-├──► GND
-   │ ═══════ │──(-)──┼────────────┤           │
-   └─────────┘       │            └───────────┘
-                     │                │
-                     │                │ (Adjust pot to 5.0V output!)
-                     │                │
-                     │     ┌──────────┴──────────┐
-                     │     │   ESP32-C3 SUPER    │
-                     │     │                     │
-                     └─────┤ VIN/3.3V       5V   │ ◄─ Connect boost 5V here
-                           │                     │
-                           │ GND                 │
-                           │                     │
-Voltage                    │ GPIO10 ◄── VBAT    │
-Divider:                   │      │              │
-                           └──────┼──────────────┘
-LiPo(+)──[10K]──┬───────────────┘
-                │
-               [10K]
-                │
-LiPo(-)─────────┘
-```
+*See [diagrams/rx-lipo-power.svg](diagrams/rx-lipo-power.svg) for detailed schematic*
 
-**Capacitor Placement:**
-```
-Location 1: At LiPo output (before boost converter)
-─────────────────────────────────────────────────────
-LiPo (+) ────┬──[100µF]──┬── To MT3608 VIN+
-             └─[0.1µF]───┘
-LiPo (-) ────────────────── To MT3608 VIN-
-
-Location 2: At boost converter output
-─────────────────────────────────────────────────────
-Boost VOUT+ ─┬──[100µF]──┬── To Servo/MX1508 VCC
-             └─[0.1µF]───┘
-Boost VOUT- ─────────────── To GND
-
-Location 3: At motor driver (handles motor spikes)
-─────────────────────────────────────────────────────
-MX1508 VCC ──┬──[1000µF]─┬── (same connection)
-             │           │
-MX1508 GND ──┴───────────┴── (same connection)
-```
+**Key connections:**
+- LiPo → MT3608 boost converter → 5V for servo and motors
+- LiPo → ESP32 VIN directly (internal 3.3V regulator)
+- Voltage divider on GPIO10 for battery monitoring
 
 ### MT3608 Boost Converter Setup
 
@@ -739,22 +533,12 @@ MX1508 GND ──┴───────────┴── (same connection)
 3. Adjust potentiometer until output reads **5.0V**
 4. Mark the position!
 
-**MT3608 Pinout:**
-```
-    ┌─────────────────┐
-    │     MT3608      │
-    │   ┌─────────┐   │
-    │   │   POT   │   │ ← Adjustment potentiometer
-    │   └─────────┘   │
-    │                 │
-    │ VIN+  VIN-  VOUT+  VOUT- │
-    └──┬─────┬──────┬──────┬───┘
-       │     │      │      │
-    3.7V   GND    5V    GND
-    from   from   to    to
-    LiPo   LiPo  servo  servo
-                  etc   etc
-```
+**Capacitor Placement:**
+| Location | Capacitors | Purpose |
+|----------|------------|---------|
+| LiPo output | 100µF + 0.1µF | Input smoothing |
+| Boost output | 100µF + 0.1µF | Output smoothing |
+| MX1508 | 1000µF | Motor spike absorption |
 
 ### RX Battery Checklist
 

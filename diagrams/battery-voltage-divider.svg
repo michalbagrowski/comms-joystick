@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 550 400">
+  <!-- Background -->
+  <rect width="550" height="400" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="275" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#333">Battery Voltage Divider Circuit</text>
+  <text x="275" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666">Scales 4.2V LiPo to safe 2.1V for ESP32 ADC</text>
+
+  <!-- Main Circuit Area -->
+  <rect x="50" y="70" width="450" height="230" rx="10" fill="white" stroke="#ddd" stroke-width="2"/>
+
+  <!-- LiPo Battery -->
+  <g transform="translate(80, 100)">
+    <rect x="0" y="0" width="70" height="120" rx="5" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <rect x="20" y="-8" width="30" height="10" rx="2" fill="#2980b9"/>
+    <text x="35" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">LiPo</text>
+    <text x="35" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#d6eaf8">3.7V</text>
+    <text x="35" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#d6eaf8">(3.0-4.2V)</text>
+
+    <!-- Battery terminals -->
+    <rect x="55" y="30" width="25" height="15" rx="2" fill="#c41e3a"/>
+    <text x="67" y="42" text-anchor="middle" font-family="Arial" font-size="9" fill="white">+</text>
+    <rect x="55" y="75" width="25" height="15" rx="2" fill="#333"/>
+    <text x="67" y="87" text-anchor="middle" font-family="Arial" font-size="9" fill="white">-</text>
+  </g>
+
+  <!-- R1 Resistor (Top) -->
+  <g transform="translate(200, 110)">
+    <rect x="0" y="0" width="15" height="60" fill="#d4a574" stroke="#8b6914" stroke-width="1"/>
+    <rect x="-2" y="5" width="19" height="5" fill="#8b4513"/>
+    <rect x="-2" y="15" width="19" height="5" fill="#000"/>
+    <rect x="-2" y="25" width="19" height="5" fill="#ff8c00"/>
+    <rect x="-2" y="35" width="19" height="5" fill="#ffd700"/>
+    <text x="35" y="35" font-family="Arial" font-size="12" font-weight="bold" fill="#333">R1</text>
+    <text x="35" y="50" font-family="Arial" font-size="11" fill="#333">10K</text>
+  </g>
+
+  <!-- R2 Resistor (Bottom) -->
+  <g transform="translate(200, 200)">
+    <rect x="0" y="0" width="15" height="60" fill="#d4a574" stroke="#8b6914" stroke-width="1"/>
+    <rect x="-2" y="5" width="19" height="5" fill="#8b4513"/>
+    <rect x="-2" y="15" width="19" height="5" fill="#000"/>
+    <rect x="-2" y="25" width="19" height="5" fill="#ff8c00"/>
+    <rect x="-2" y="35" width="19" height="5" fill="#ffd700"/>
+    <text x="35" y="35" font-family="Arial" font-size="12" font-weight="bold" fill="#333">R2</text>
+    <text x="35" y="50" font-family="Arial" font-size="11" fill="#333">10K</text>
+  </g>
+
+  <!-- ESP32 Section -->
+  <rect x="350" y="120" width="130" height="130" rx="5" fill="#2d5a27" stroke="#1a3a17" stroke-width="2"/>
+  <text x="415" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">ESP32-C3</text>
+
+  <!-- GPIO10 Pin -->
+  <rect x="355" y="165" width="50" height="20" rx="3" fill="#f39c12"/>
+  <text x="380" y="179" text-anchor="middle" font-family="monospace" font-size="9" fill="white">GPIO10</text>
+
+  <!-- 3.3V Pin -->
+  <rect x="355" y="195" width="50" height="20" rx="3" fill="#8e44ad"/>
+  <text x="380" y="209" text-anchor="middle" font-family="monospace" font-size="9" fill="white">3.3V/VIN</text>
+
+  <!-- GND Pin -->
+  <rect x="355" y="225" width="50" height="20" rx="3" fill="#333"/>
+  <text x="380" y="239" text-anchor="middle" font-family="monospace" font-size="9" fill="white">GND</text>
+
+  <!-- Wiring -->
+  <!-- Battery + to R1 top and 3.3V -->
+  <line x1="160" y1="137" x2="207" y2="137" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="207" y1="110" x2="207" y2="137" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="160" y1="137" x2="160" y2="90" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="160" y1="90" x2="300" y2="90" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="300" y1="90" x2="300" y2="205" stroke="#c41e3a" stroke-width="3"/>
+  <line x1="300" y1="205" x2="355" y2="205" stroke="#c41e3a" stroke-width="3"/>
+
+  <!-- Junction between R1 and R2 to GPIO10 -->
+  <line x1="207" y1="170" x2="207" y2="200" stroke="#333" stroke-width="2"/>
+  <line x1="207" y1="185" x2="280" y2="185" stroke="#f39c12" stroke-width="3"/>
+  <line x1="280" y1="175" x2="280" y2="185" stroke="#f39c12" stroke-width="3"/>
+  <line x1="280" y1="175" x2="355" y2="175" stroke="#f39c12" stroke-width="3"/>
+
+  <!-- R2 bottom to GND -->
+  <line x1="207" y1="260" x2="207" y2="280" stroke="#333" stroke-width="3"/>
+
+  <!-- Battery - to GND bus -->
+  <line x1="160" y1="182" x2="160" y2="280" stroke="#333" stroke-width="3"/>
+  <line x1="160" y1="280" x2="380" y2="280" stroke="#333" stroke-width="3"/>
+  <line x1="380" y1="245" x2="380" y2="280" stroke="#333" stroke-width="3"/>
+
+  <!-- Junction dots -->
+  <circle cx="207" cy="137" r="4" fill="#c41e3a"/>
+  <circle cx="207" cy="185" r="4" fill="#f39c12"/>
+  <circle cx="160" cy="280" r="4" fill="#333"/>
+  <circle cx="207" cy="280" r="4" fill="#333"/>
+
+  <!-- GND Symbol -->
+  <g transform="translate(280, 280)">
+    <line x1="0" y1="0" x2="0" y2="12" stroke="#333" stroke-width="3"/>
+    <line x1="-12" y1="12" x2="12" y2="12" stroke="#333" stroke-width="3"/>
+    <line x1="-8" y1="16" x2="8" y2="16" stroke="#333" stroke-width="2"/>
+    <line x1="-4" y1="20" x2="4" y2="20" stroke="#333" stroke-width="1"/>
+  </g>
+
+  <!-- Formula Box -->
+  <rect x="50" y="310" width="220" height="80" rx="5" fill="#e3f2fd" stroke="#2196f3" stroke-width="1"/>
+  <text x="160" y="330" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#1565c0">Voltage Divider Formula</text>
+  <text x="160" y="350" text-anchor="middle" font-family="monospace" font-size="11" fill="#333">Vout = Vin × R2/(R1+R2)</text>
+  <text x="160" y="368" text-anchor="middle" font-family="monospace" font-size="11" fill="#333">Vout = 4.2V × 10K/(10K+10K)</text>
+  <text x="160" y="385" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#1565c0">Vout = 2.1V (safe for ADC)</text>
+
+  <!-- Code Box -->
+  <rect x="280" y="310" width="220" height="80" rx="5" fill="#fff3e0" stroke="#ff9800" stroke-width="1"/>
+  <text x="390" y="330" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#e65100">Code Calculation</text>
+  <text x="390" y="350" text-anchor="middle" font-family="monospace" font-size="10" fill="#333">rawADC = analogRead(GPIO10)</text>
+  <text x="390" y="368" text-anchor="middle" font-family="monospace" font-size="10" fill="#333">voltage = rawADC/4095 × 3.3</text>
+  <text x="390" y="385" text-anchor="middle" font-family="monospace" font-size="10" font-weight="bold" fill="#e65100">batteryV = voltage × 2.0</text>
+
+  <!-- Labels -->
+  <text x="207" y="100" text-anchor="middle" font-family="Arial" font-size="9" fill="#c41e3a">4.2V max</text>
+  <text x="250" y="180" text-anchor="middle" font-family="Arial" font-size="9" fill="#f39c12">2.1V max</text>
+</svg>
