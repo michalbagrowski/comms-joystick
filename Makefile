@@ -49,7 +49,7 @@ help:
 	@echo "  compact-all             - Compile TX + compact RX, upload both"
 	@echo "  compact-wifi-compile    - Compile compact receiver (WiFi mode)"
 	@echo ""
-	@echo "Example usage:
+	@echo "Example usage:"
 	@echo "  make install-libs"
 	@echo "  make all                # BLE mode (default)"
 	@echo "  make wifi-all           # WiFi mode"

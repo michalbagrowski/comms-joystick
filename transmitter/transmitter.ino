@@ -46,7 +46,7 @@
 #define VBAT_PIN 10
 #define VBAT_DIVIDER 2.0          // Voltage divider ratio (10K/10K)
 #define VBAT_WARNING 3.5          // Low battery warning threshold
-#define VBAT_CUTOFF 3.3           // Shutdown threshold (protect LiPo)
+#define VBAT_CUTOFF 3.2           // Shutdown threshold (protect LiPo)
 #define VBAT_SAMPLES 10           // ADC samples for averaging
 
 // Joystick 1 center values (measured at rest)
@@ -108,7 +108,7 @@ float readBatteryVoltage() {
     sum += analogRead(VBAT_PIN);
     delayMicroseconds(100);
   }
-  float avgRaw = sum / VBAT_SAMPLES;
+  float avgRaw = (float)sum / VBAT_SAMPLES;
   return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
 }
 

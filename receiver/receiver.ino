@@ -52,7 +52,7 @@
 #define VBAT_PIN 10
 #define VBAT_DIVIDER 2.0          // Voltage divider ratio (10K/10K)
 #define VBAT_WARNING 3.5          // Low battery warning threshold
-#define VBAT_CUTOFF 3.3           // Shutdown threshold (protect LiPo)
+#define VBAT_CUTOFF 3.2           // Shutdown threshold (protect LiPo)
 #define VBAT_FULL 4.2             // Fully charged
 #define VBAT_SAMPLES 10           // ADC samples for averaging
 
@@ -138,7 +138,7 @@ float readBatteryVoltage() {
     sum += analogRead(VBAT_PIN);
     delayMicroseconds(100);
   }
-  float avgRaw = sum / VBAT_SAMPLES;
+  float avgRaw = (float)sum / VBAT_SAMPLES;
   // Convert to voltage: (raw / 4095) * 3.3V * divider_ratio
   return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
 }
@@ -167,7 +167,7 @@ void drawBatteryIcon(int x, int y) {
 
   // Blink if low battery
   if (lowBatteryWarning && (millis() / 500) % 2 == 0) {
-    display.fillRect(x, y, 14, 8, SSD1306_INVERSE);
+    display.fillRect(x, y, 14, 8, SSD1306_WHITE);
   }
 }
 

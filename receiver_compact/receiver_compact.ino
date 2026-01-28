@@ -84,7 +84,7 @@
 //             GPIO2 (D0)
 #define VBAT_DIVIDER 2.0
 #define VBAT_WARNING 3.5
-#define VBAT_CUTOFF 3.3
+#define VBAT_CUTOFF 3.2
 #define VBAT_FULL 4.2
 #define VBAT_SAMPLES 10
 
@@ -172,7 +172,7 @@ float readBatteryVoltage() {
     sum += analogRead(VBAT_PIN);
     delayMicroseconds(100);
   }
-  float avgRaw = sum / VBAT_SAMPLES;
+  float avgRaw = (float)sum / VBAT_SAMPLES;
   return (avgRaw / 4095.0) * 3.3 * VBAT_DIVIDER;
 }
 
