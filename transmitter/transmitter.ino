@@ -59,6 +59,12 @@
 #define JOY2_CENTER_X 2215
 #define JOY2_CENTER_Y 2255
 
+// Direction detection threshold
+#define DIRECTION_THRESHOLD 1500
+
+// Display constants
+#define DEGREE_SYMBOL 247    // ASCII code for degree symbol
+
 // ========================================
 // COMMUNICATION CONFIGURATION
 // ========================================
@@ -181,12 +187,10 @@ class MyServerCallbacks: public BLEServerCallbacks {
 #endif
 
 String getDirection(int x, int y, int centerX, int centerY) {
-  int threshold = 1500;
-
   int dx = x - centerX;
   int dy = y - centerY;
 
-  if (abs(dx) < threshold && abs(dy) < threshold) return "CENTER";
+  if (abs(dx) < DIRECTION_THRESHOLD && abs(dy) < DIRECTION_THRESHOLD) return "CENTER";
 
   if (abs(dx) > abs(dy)) {
     return (dx > 0) ? "RIGHT" : "LEFT";
@@ -256,7 +260,7 @@ void drawFakeServoAngle(int16_t joy1_x) {
   display.setTextSize(1);
   display.print("S:");
   display.print(servo_angle);
-  display.print((char)247);  // Degree symbol
+  display.print((char)DEGREE_SYMBOL);
 
   // Servo position bar (horizontal, fills left-to-right)
   int barY = 40;
@@ -274,11 +278,13 @@ void drawFakeMotorSpeeds(int16_t joy2_x, int16_t joy2_y) {
   int motor2_speed = 0;
 
   // Motor 1 from Joy2 X-axis
+  // Map from offset to get consistent behavior with deadzone
   int joy2x_offset = joy2_x - JOY2_CENTER_X;
   if (abs(joy2x_offset) < MOTOR_DEADZONE) {
     motor1_speed = 0;
   } else {
-    motor1_speed = map(joy2_x, 0, 4095, -255, 255);
+    // Map from offset range to -255..255 for consistent behavior
+    motor1_speed = map(joy2x_offset, -JOY2_CENTER_X, 4095 - JOY2_CENTER_X, -255, 255);
     motor1_speed = constrain(motor1_speed, -255, 255);
   }
 
@@ -287,7 +293,8 @@ void drawFakeMotorSpeeds(int16_t joy2_x, int16_t joy2_y) {
   if (abs(joy2y_offset) < MOTOR_DEADZONE) {
     motor2_speed = 0;
   } else {
-    motor2_speed = map(joy2_y, 0, 4095, -255, 255);
+    // Map from offset range to -255..255 for consistent behavior
+    motor2_speed = map(joy2y_offset, -JOY2_CENTER_Y, 4095 - JOY2_CENTER_Y, -255, 255);
     motor2_speed = constrain(motor2_speed, -255, 255);
   }
 
@@ -306,11 +313,11 @@ void drawFakeMotorSpeeds(int16_t joy2_x, int16_t joy2_y) {
   if (motor1_speed > 0) {
     // Right side (forward)
     display.fillRect(bar1_center + 1, 51, bar1_width, 4, SH110X_WHITE);
-    if (motor1_speed > 0) display.drawChar(bar1_center + bar1_width + 3, 48, '>', SH110X_WHITE, SH110X_BLACK, 1);
+    display.drawChar(bar1_center + bar1_width + 3, 48, '>', SH110X_WHITE, SH110X_BLACK, 1);
   } else if (motor1_speed < 0) {
     // Left side (reverse)
     display.fillRect(bar1_center - bar1_width, 51, bar1_width, 4, SH110X_WHITE);
-    if (motor1_speed < 0) display.drawChar(bar1_center - bar1_width - 7, 48, '<', SH110X_WHITE, SH110X_BLACK, 1);
+    display.drawChar(bar1_center - bar1_width - 7, 48, '<', SH110X_WHITE, SH110X_BLACK, 1);
   }
 
   // Draw Motor 2 bar (horizontal, centered at y=58)
@@ -328,11 +335,11 @@ void drawFakeMotorSpeeds(int16_t joy2_x, int16_t joy2_y) {
   if (motor2_speed > 0) {
     // Right side (forward)
     display.fillRect(bar2_center + 1, 59, bar2_width, 4, SH110X_WHITE);
-    if (motor2_speed > 0) display.drawChar(bar2_center + bar2_width + 3, 56, '>', SH110X_WHITE, SH110X_BLACK, 1);
+    display.drawChar(bar2_center + bar2_width + 3, 56, '>', SH110X_WHITE, SH110X_BLACK, 1);
   } else if (motor2_speed < 0) {
     // Left side (reverse)
     display.fillRect(bar2_center - bar2_width, 59, bar2_width, 4, SH110X_WHITE);
-    if (motor2_speed < 0) display.drawChar(bar2_center - bar2_width - 7, 56, '<', SH110X_WHITE, SH110X_BLACK, 1);
+    display.drawChar(bar2_center - bar2_width - 7, 56, '<', SH110X_WHITE, SH110X_BLACK, 1);
   }
 }
 

@@ -140,8 +140,8 @@ int servo_angle = 90;
   static boolean doConnect = false;
   static boolean connected = false;
   static boolean doScan = false;
-  static BLERemoteCharacteristic* pRemoteCharacteristic;
-  static BLEAdvertisedDevice* myDevice;
+  static BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
+  static BLEAdvertisedDevice* myDevice = nullptr;
 #endif
 
 struct JoystickData {
@@ -158,6 +158,10 @@ struct JoystickData {
 
 volatile bool outputsEnabled = false;
 bool servoAttached = false;
+
+// Communication timeout - stop motors if no data received
+#define COMM_TIMEOUT_MS 500
+volatile unsigned long lastDataTime = 0;
 
 // Battery state
 float batteryVoltage = 4.2;
@@ -359,6 +363,10 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
     if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(BLEUUID(SERVICE_UUID))) {
       BLEDevice::getScan()->stop();
+      // Free previous device if exists to prevent memory leak
+      if (myDevice != nullptr) {
+        delete myDevice;
+      }
       myDevice = new BLEAdvertisedDevice(advertisedDevice);
       doConnect = true;
       doScan = false;
@@ -370,6 +378,7 @@ static void notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
                             uint8_t* pData, size_t length, bool isNotify) {
   if (length == sizeof(JoystickData)) {
     memcpy(&joystickData, pData, sizeof(JoystickData));
+    lastDataTime = millis();  // Update timestamp for timeout detection
     if (!outputsEnabled) {
       outputsEnabled = true;
       enableMotors(true);
@@ -542,12 +551,22 @@ void loop() {
     }
   }
 
+  // Communication timeout failsafe - stop motors if no data received
+  if (outputsEnabled && (millis() - lastDataTime > COMM_TIMEOUT_MS)) {
+    Serial.println("FAILSAFE: Communication timeout - stopping motors");
+    enableMotors(false);
+    motor1_speed = 0;
+    motor2_speed = 0;
+    outputsEnabled = false;  // Will re-enable when data resumes
+  }
+
   // Handle communication
   #ifdef USE_WIFI
     if (wifiConnected) {
       int packetSize = udp.parsePacket();
       if (packetSize == sizeof(JoystickData)) {
         udp.read((uint8_t*)&joystickData, sizeof(JoystickData));
+        lastDataTime = millis();  // Update timestamp for timeout detection
         if (!outputsEnabled) {
           outputsEnabled = true;
           enableMotors(true);

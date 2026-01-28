@@ -62,6 +62,12 @@
 #define MOTOR_PWM_FREQ 20000 // 20kHz PWM frequency for motors
 #define MOTOR_PWM_RES 8      // 8-bit resolution (0-255)
 
+// Direction detection threshold
+#define DIRECTION_THRESHOLD 1500
+
+// Display constants
+#define DEGREE_SYMBOL 247    // ASCII code for degree symbol
+
 // Joystick 1 center values (measured at rest)
 #define JOY1_CENTER_X 2235
 #define JOY1_CENTER_Y 2217
@@ -107,8 +113,8 @@ int servo_angle = 90;  // Current servo angle
   static boolean doConnect = false;
   static boolean connected = false;
   static boolean doScan = false;
-  static BLERemoteCharacteristic* pRemoteCharacteristic;
-  static BLEAdvertisedDevice* myDevice;
+  static BLERemoteCharacteristic* pRemoteCharacteristic = nullptr;
+  static BLEAdvertisedDevice* myDevice = nullptr;
 #endif
 
 struct JoystickData {
@@ -126,6 +132,10 @@ struct JoystickData {
 // Flag to prevent motor/servo activation until valid data received
 volatile bool outputsEnabled = false;  // volatile for BLE callback safety
 bool servoAttached = false;
+
+// Communication timeout - stop motors if no data received
+#define COMM_TIMEOUT_MS 500
+volatile unsigned long lastDataTime = 0;
 
 // Battery monitoring
 float batteryVoltage = 4.2;  // Current battery voltage
@@ -173,12 +183,10 @@ void drawBatteryIcon(int x, int y) {
 }
 
 String getDirection(int x, int y, int centerX, int centerY) {
-  int threshold = 1500;
-
   int dx = x - centerX;
   int dy = y - centerY;
 
-  if (abs(dx) < threshold && abs(dy) < threshold) return "CENTER";
+  if (abs(dx) < DIRECTION_THRESHOLD && abs(dy) < DIRECTION_THRESHOLD) return "CENTER";
 
   if (abs(dx) > abs(dy)) {
     return (dx > 0) ? "RIGHT" : "LEFT";
@@ -240,11 +248,13 @@ void drawJoystick(int16_t joyX, int16_t joyY, uint8_t button, int centerX, int c
 // Motor control function
 void controlMotors(int16_t joy2_x, int16_t joy2_y) {
   // Calculate motor 1 speed from Joy2 X-axis (left/right)
+  // Map from offset to get consistent behavior with deadzone
   int joy2x_offset = joy2_x - JOY2_CENTER_X;
   if (abs(joy2x_offset) < MOTOR_DEADZONE) {
     motor1_speed = 0;
   } else {
-    motor1_speed = map(joy2_x, 0, 4095, -255, 255);
+    // Map from offset range to -255..255 for consistent behavior
+    motor1_speed = map(joy2x_offset, -JOY2_CENTER_X, 4095 - JOY2_CENTER_X, -255, 255);
     motor1_speed = constrain(motor1_speed, -255, 255);
   }
 
@@ -253,7 +263,8 @@ void controlMotors(int16_t joy2_x, int16_t joy2_y) {
   if (abs(joy2y_offset) < MOTOR_DEADZONE) {
     motor2_speed = 0;
   } else {
-    motor2_speed = map(joy2_y, 0, 4095, -255, 255);
+    // Map from offset range to -255..255 for consistent behavior
+    motor2_speed = map(joy2y_offset, -JOY2_CENTER_Y, 4095 - JOY2_CENTER_Y, -255, 255);
     motor2_speed = constrain(motor2_speed, -255, 255);
   }
 
@@ -290,7 +301,7 @@ void drawServoBar() {
   display.setTextSize(1);
   display.print("S:");
   display.print(servo_angle);
-  display.print((char)247);  // Degree symbol
+  display.print((char)DEGREE_SYMBOL);
 
   // Servo position bar (horizontal, fills left-to-right)
   int barY = 40;
@@ -357,6 +368,7 @@ static void notifyCallback(
   bool isNotify) {
   if (length == sizeof(joystickData)) {
     memcpy(&joystickData, pData, sizeof(joystickData));
+    lastDataTime = millis();  // Update timestamp for timeout detection
     outputsEnabled = true;  // Enable outputs after first valid data
   }
 }
@@ -421,6 +433,10 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
     if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(BLEUUID(SERVICE_UUID))) {
       BLEDevice::getScan()->stop();
+      // Free previous device if exists to prevent memory leak
+      if (myDevice != nullptr) {
+        delete myDevice;
+      }
       myDevice = new BLEAdvertisedDevice(advertisedDevice);
       doConnect = true;
       doScan = true;
@@ -498,8 +514,7 @@ void setup() {
       if (connect_timeout <= 0) {
         Serial.println("\n\nFailed to connect to WiFi! Halting.");
         Serial.println("Please check SSID and password.");
-        // Infinite error indication - blink LED since servo not initialized yet
-        pinMode(LED_PIN, OUTPUT);
+        // Infinite error indication - blink LED (already configured as OUTPUT)
         while(true) {
           digitalWrite(LED_PIN, LOW);
           delay(150);
@@ -590,12 +605,12 @@ void setup() {
   Serial.println("I2C initialized on SDA=GPIO6, SCL=GPIO7");
   Serial.flush();
 
-  Serial.print("DEBUG: Initializing SH1106 display at address 0x");
+  Serial.print("DEBUG: Initializing SSD1306 display at address 0x");
   Serial.println(SCREEN_ADDRESS, HEX);
   Serial.flush();
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SH1106 allocation failed"));
+    Serial.println(F("SSD1306 allocation failed"));
     Serial.flush();
     for(;;);
   }
@@ -687,6 +702,23 @@ void loop() {
     }
   }
 
+  // ========================================
+  // COMMUNICATION TIMEOUT FAILSAFE
+  // ========================================
+  // Stop motors if no data received for COMM_TIMEOUT_MS
+  if (outputsEnabled && (millis() - lastDataTime > COMM_TIMEOUT_MS)) {
+    Serial.println("FAILSAFE: Communication timeout - stopping motors");
+    // Stop all motors immediately
+    ledcWrite(MOTOR1_IN1, 0);
+    ledcWrite(MOTOR1_IN2, 0);
+    ledcWrite(MOTOR2_IN3, 0);
+    ledcWrite(MOTOR2_IN4, 0);
+    motor1_speed = 0;
+    motor2_speed = 0;
+    // Keep servo at last position (safer than moving)
+    outputsEnabled = false;  // Will re-enable when data resumes
+  }
+
   // If battery shutdown, show warning and don't process
   if (batteryShutdown) {
     display.clearDisplay();
@@ -710,6 +742,7 @@ void loop() {
         if (packetSize == sizeof(joystickData)) {
           udp.read((uint8_t*)&joystickData, sizeof(joystickData));
           dataReceived = true;
+          lastDataTime = millis();  // Update timestamp for timeout detection
           outputsEnabled = true;  // Enable outputs after first valid data
 
           // Store transmitter IP if we didn't find it via mDNS
