@@ -83,9 +83,10 @@
 //                |
 //             GPIO2 (D0)
 #define VBAT_DIVIDER 2.0
-#define VBAT_WARNING 3.5
-#define VBAT_CUTOFF 3.2
-#define VBAT_FULL 4.2
+#define VBAT_FULL 4.2             // Fully charged voltage
+#define VBAT_EMPTY 3.3            // Empty voltage (0% display threshold)
+#define VBAT_WARNING 3.5          // Low battery warning threshold
+#define VBAT_CUTOFF 3.2           // Shutdown threshold (protect LiPo)
 #define VBAT_SAMPLES 10
 
 // ========================================
@@ -177,9 +178,9 @@ float readBatteryVoltage() {
 }
 
 int getBatteryPercent() {
-  if (batteryVoltage >= 4.2) return 100;
-  if (batteryVoltage <= 3.3) return 0;
-  return (int)((batteryVoltage - 3.3) / 0.9 * 100);
+  if (batteryVoltage >= VBAT_FULL) return 100;
+  if (batteryVoltage <= VBAT_EMPTY) return 0;
+  return (int)((batteryVoltage - VBAT_EMPTY) / (VBAT_FULL - VBAT_EMPTY) * 100);
 }
 
 #ifdef USE_DISPLAY
