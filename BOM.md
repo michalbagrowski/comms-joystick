@@ -4,9 +4,9 @@
 
 | Build | Components | Est. Cost |
 |-------|------------|-----------|
-| Standard TX + RX | Full-size modules | ~$45 |
-| Standard TX + Compact RX | Mixed | ~$35 |
-| Compact RX only | Miniaturized | ~$25 |
+| Standard TX + RX | Full-size modules | ~$50 |
+| Standard TX + Compact RX | Mixed | ~$40 |
+| Compact RX only | Miniaturized | ~$28 |
 
 ---
 
@@ -14,8 +14,8 @@
 
 ### Transmitter (TX) - ESP32-C3 Super Mini
 
-| Qty | Component | Specs | Est. Price | Link/Notes |
-|-----|-----------|-------|------------|------------|
+| Qty | Component | Specs | Est. Price | Notes |
+|-----|-----------|-------|------------|-------|
 | 1 | ESP32-C3 Super Mini | 22x18mm | $4 | AliExpress |
 | 2 | HW-504 Joystick Module | Analog XY + button | $2 | |
 | 1 | 1.9" OLED Display | 128x64, I2C, SH1106 | $4 | 3.3V only! |
@@ -26,15 +26,15 @@
 
 ### Receiver (RX) - Standard Build
 
-| Qty | Component | Specs | Est. Price | Link/Notes |
-|-----|-----------|-------|------------|------------|
+| Qty | Component | Specs | Est. Price | Notes |
+|-----|-----------|-------|------------|-------|
 | 1 | ESP32-C3 Super Mini | 22x18mm | $4 | AliExpress |
 | 1 | MX1508 Motor Driver | Dual H-bridge | $2 | |
 | 1 | SG90 Servo | Standard size | $3 | |
 | 2 | DC Motors | 3-6V, with gearbox | $4 | |
 | 1 | 1.3" OLED Display | 128x64, I2C, SSD1306 | $3 | 3.3V only! |
-| 1 | 2N2222 NPN Transistor | Motor enable circuit | $0.20 | |
-| 1 | 1K Resistor | 1/4W | $0.05 | |
+| 1 | 2N2222 NPN Transistor | Motor enable circuit | $0.20 | Prevents boot twitch |
+| 1 | 1K Resistor | 1/4W | $0.05 | Base resistor for transistor |
 | 1 | 5V 2A Power Adapter | USB-C or barrel | $5 | For motors |
 
 **RX Standard Subtotal: ~$21**
@@ -43,9 +43,9 @@
 
 | Qty | Component | Purpose | Est. Price |
 |-----|-----------|---------|------------|
-| 1 | 1000µF Electrolytic Cap | Motor power smoothing | $0.50 |
-| 2 | 100µF Electrolytic Cap | Power stability | $0.30 |
-| 4 | 0.1µF Ceramic Cap | ADC filtering | $0.20 |
+| 1 | 1000uF Electrolytic Cap | Motor power smoothing | $0.50 |
+| 2 | 100uF Electrolytic Cap | Power stability | $0.30 |
+| 4 | 0.1uF Ceramic Cap | ADC filtering | $0.20 |
 | 2 | Breadboard 830pt | Prototyping | $6 |
 
 ---
@@ -58,15 +58,16 @@ Use standard TX build above (~$14)
 
 ### Receiver (RX) - Compact Build
 
-| Qty | Component | Size | Est. Price | Link/Notes |
-|-----|-----------|------|------------|------------|
-| 1 | **Seeed XIAO ESP32-C3** | 21x17mm | $5 | [Seeed Studio](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) |
-| 1 | **DRV8833 Breakout** | 10x15mm | $2 | Search "DRV8833 module" |
-| 2 | Micro DC Motors | N20 or smaller | $3 | Your choice |
+| Qty | Component | Size | Est. Price | Notes |
+|-----|-----------|------|------------|-------|
+| 1 | **Seeed XIAO ESP32-C3** | 21x17mm | $5 | Built-in LiPo charging! |
+| 1 | **DRV8833 Breakout** | 10x15mm | $2 | Has nSLEEP pin |
+| 2 | Micro DC Motors | N20 or smaller | $3 | |
 | 1 | Micro Linear Servo | ~20x10mm | $8 | PZ-15320 or similar |
 | 1 | LiPo Battery | 100-200mAh, 1S | $4 | 501220 or 602025 size |
+| 1 | **1S LiPo Protection PCB** | 5x10mm | $0.30 | **Required for safety** |
 | 2 | 10K Resistor | 0402 or 0603 SMD | $0.10 | Voltage divider |
-| 1 | 100µF Capacitor | SMD or small | $0.20 | Power smoothing |
+| 1 | 100uF Capacitor | SMD or small | $0.20 | Power smoothing |
 | - | 30AWG Silicone Wire | Thin, flexible | $2 | |
 
 **RX Compact Subtotal: ~$25**
@@ -82,7 +83,45 @@ Use standard TX build above (~$14)
 
 ---
 
-## LiPo Battery Options (Compact Build)
+## LiPo Battery Protection (REQUIRED for safe operation)
+
+The code has software low-voltage cutoff, but **hardware protection is essential** to prevent deep discharge if the ESP32 crashes or battery drains during storage.
+
+### Option 1: 1S Protection PCB Module (Recommended)
+
+| Qty | Component | Size | Est. Price | Notes |
+|-----|-----------|------|------------|-------|
+| 2 | 1S LiPo Protection Board | 5x10mm | $0.30 each | Easiest - solder inline with battery |
+
+Search: "1S 3.7V protection PCB" or "1S BMS module"
+
+**Protects against:**
+- Over-discharge (cuts off at ~2.5V)
+- Over-charge (cuts off at ~4.25V)
+- Short circuit
+- Over-current (~3A typical)
+
+**Wiring:** Battery(+) -> Protection PCB -> Load
+
+### Option 2: Protected LiPo Cell
+
+Buy batteries with protection built-in (adds ~2mm to length, +$1):
+- Search: "protected 501220 LiPo" or "protected 602025 LiPo"
+- Small PCB already attached to cell
+- No extra wiring needed
+
+### Option 3: DIY (Smallest footprint)
+
+| Qty | Component | Package | Est. Price | Notes |
+|-----|-----------|---------|------------|-------|
+| 2 | DW01A Protection IC | SOT-23-6 | $0.10 | Protection logic |
+| 2 | FS8205A Dual MOSFET | SOT-23-6 | $0.10 | Power switching |
+
+Total size: ~6x6mm per board. Requires SMD soldering skills.
+
+---
+
+## LiPo Battery Options
 
 | Size Code | Dimensions | Capacity | Est. Runtime | Price |
 |-----------|------------|----------|--------------|-------|
@@ -103,11 +142,14 @@ For portable operation with LiPo battery:
 | Qty | Component | Purpose | Est. Price |
 |-----|-----------|---------|------------|
 | 1 | 1S LiPo Battery | TX: 500-1000mAh, RX: 100-200mAh | $4-8 |
+| 2 | **1S LiPo Protection PCB** | **Over-discharge protection (1 per board)** | $0.60 |
 | 4 | 10K Resistor | Voltage dividers (2 per board) | $0.20 |
-| 2 | 100µF Electrolytic Cap | Power smoothing | $0.30 |
-| 2 | 0.1µF Ceramic Cap | High-freq filtering | $0.10 |
+| 2 | 100uF Electrolytic Cap | Power smoothing | $0.30 |
+| 2 | 0.1uF Ceramic Cap | High-freq filtering | $0.10 |
 | 1 | MT3608 Boost Converter | 5V for RX servo (standard build) | $1 |
-| 1 | TP4056 Charger Module | LiPo charging (standard build) | $1 |
+| 1 | TP4056 Charger Module | LiPo charging (standard build TX) | $1 |
+| 2 | Slide Switch SPDT | Power on/off | $0.50 |
+| 2 | JST-PH 2.0 Connector | Battery plug (optional) | $0.30 |
 
 **Note:** XIAO ESP32-C3 has built-in LiPo charging - no TP4056 needed for compact build!
 
@@ -118,8 +160,8 @@ For portable operation with LiPo battery:
 ### Standard Build
 | Model | Size | Torque | Voltage | Price |
 |-------|------|--------|---------|-------|
-| SG90 | 23x12x29mm | 1.8kg·cm | 4.8-6V | $3 |
-| MG90S | 23x12x29mm | 2.2kg·cm | 4.8-6V | $4 |
+| SG90 | 23x12x29mm | 1.8kg-cm | 4.8-6V | $3 |
+| MG90S | 23x12x29mm | 2.2kg-cm | 4.8-6V | $4 |
 
 ### Compact Build (Linear Servos)
 | Model | Size | Stroke | Voltage | Price |
@@ -148,6 +190,61 @@ Recommended: **N20 with gearbox** - good torque, reasonable size
 
 ---
 
+## Complete Shopping List - Standard Build (TX + RX)
+
+```
+CORE COMPONENTS:
+2x ESP32-C3 Super Mini
+2x HW-504 Joystick Module
+1x 1.9" OLED 128x64 SH1106 I2C (TX)
+1x 1.3" OLED 128x64 SSD1306 I2C (RX)
+1x MX1508 Dual Motor Driver
+1x SG90 Servo
+2x DC Motor 3-6V with gearbox
+1x 2N2222 NPN Transistor
+1x 1K Resistor 1/4W
+2x USB-C Data Cable
+
+FOR LIPO OPERATION (optional):
+2x 1S LiPo Battery (TX: 500-1000mAh, RX: 1000-2000mAh)
+2x 1S LiPo Protection PCB 5x10mm  <-- REQUIRED FOR SAFETY
+4x 10K Resistor (voltage dividers)
+1x MT3608 Boost Converter (RX only)
+1x TP4056 Charger Module (TX only)
+2x Slide Switch SPDT
+2x 100uF Electrolytic Capacitor
+2x 0.1uF Ceramic Capacitor
+
+RECOMMENDED:
+1x 1000uF Electrolytic Capacitor (motor smoothing)
+4x 0.1uF Ceramic Capacitor (ADC filtering)
+1x 5V 2A+ USB-C Power Adapter
+2x Breadboard 830pt
+1x Jumper Wire Kit
+```
+
+---
+
+## Complete Shopping List - Compact Build (RX only)
+
+```
+1x Seeed XIAO ESP32-C3
+1x DRV8833 dual motor driver breakout
+2x N20 micro gear motor 3-6V
+1x Micro linear servo (or PZ-15320)
+1x 501220 LiPo battery 100mAh (or 602025 200mAh)
+1x 1S LiPo Protection PCB 5x10mm  <-- REQUIRED FOR SAFETY
+2x 10K resistor 0402 or 0603
+1x 100uF capacitor SMD
+1x 30AWG silicone wire (1m each: red, black, colors)
+
+OPTIONAL:
+1x 0.42" OLED 72x40 I2C (debugging)
+1x Slide switch (power on/off)
+```
+
+---
+
 ## Where to Buy
 
 | Component | Best Source |
@@ -158,9 +255,11 @@ Recommended: **N20 with gearbox** - good torque, reasonable size
 | MX1508 | AliExpress |
 | N20 Motors | AliExpress, Amazon |
 | LiPo Batteries | AliExpress (search by size code) |
+| **1S Protection PCB** | AliExpress ("1S 3.7V protection board") |
 | OLED Displays | AliExpress, Amazon |
 | Servos | Amazon, HobbyKing |
 | Capacitors/Resistors | LCSC, Mouser, DigiKey |
+| TP4056/MT3608 | AliExpress |
 
 ---
 
@@ -177,23 +276,6 @@ Recommended: **N20 with gearbox** - good torque, reasonable size
 
 ---
 
-## Quick Order List (Compact Build)
-
-Copy this for ordering:
-
-```
-1x Seeed XIAO ESP32-C3
-1x DRV8833 dual motor driver breakout
-2x N20 micro gear motor 3-6V (your RPM choice)
-1x Micro linear servo (or PZ-15320)
-1x 501220 LiPo battery 100mAh (or 602025 200mAh)
-1x 0.42" OLED 72x40 I2C (optional)
-2x 10K resistor 0402 or 0603
-1x 100µF capacitor SMD
-1x 30AWG silicone wire (1m each: red, black, other colors)
-```
-
----
-
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** 2026-01-28
+**Changes:** Added LiPo protection PCB as required component, reorganized LiPo section
