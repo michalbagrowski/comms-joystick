@@ -41,7 +41,7 @@ Wireless dual-joystick controller with servo and DC motor control between two ES
 | 1 | Motor1 IN2 | MX1508 reverse |
 | 2 | Motor2 IN3 | MX1508 forward |
 | 3 | Motor2 IN4 | MX1508 reverse |
-| 4 | Servo | SG90 PWM signal |
+| 4 | Servo | PWM signal (SG90 or GS-1502) |
 | 5 | Motor Enable | 2N2222 transistor base |
 | 6 | I2C SDA | Display |
 | 7 | I2C SCL | Display |
@@ -124,11 +124,12 @@ struct JoystickData {
 |-----------|---------|---------|
 | ESP32-C3 | 3.3V | 200mA |
 | Display | 3.3V | 20mA |
-| Servo | 5V | 100-500mA |
+| Servo (SG90) | 4.8-6V | 100-500mA |
+| Servo (GS-1502) | 3.7-5V | 50-150mA |
 | Motors (x2) | 5V via MX1508 | 1-2A each |
 
 **TX:** USB power sufficient, or 1S LiPo (500-1000mAh)
-**RX:** 5V 2A+ adapter recommended, or 1S LiPo + MT3608 boost converter
+**RX:** 5V 2A+ adapter recommended, or 1S LiPo (GS-1502 needs no boost, SG90 needs MT3608)
 
 ---
 

@@ -186,7 +186,7 @@ Before powering on, verify each connection:
 ## RX: What You Need
 
 - 1x ESP32-C3 Super Mini
-- 1x SG90 Servo (or compatible)
+- 1x Servo: SG90 (standard) or GS-1502 (compact, 3.7-5V)
 - 1x MX1508 Motor Driver module
 - 2x DC Motors (3.7V rated)
 - 1x 1.3" SH1106 OLED Display (128x64, I2C)
@@ -246,8 +246,9 @@ SDA                   →   GPIO6
 - **ALWAYS use 3.3V for the display**
 - **5V will permanently damage the OLED!**
 
-### Step 2: Connect Servo (SG90)
+### Step 2: Connect Servo
 
+**Option A: SG90 (Standard Build)**
 ```
 SG90 Servo               ESP32-C3
 ──────────               ────────
@@ -256,21 +257,20 @@ Red (VCC)            →   5V
 Orange/Yellow (Signal)→  GPIO4
 ```
 
-**Servo Physical Layout:**
+**Option B: GS-1502 (Compact Build - Recommended)**
 ```
-      ┌─────────────┐
-      │   SG90      │
-      │   SERVO     │
-      │      ◄──    │  ← Output shaft
-      ├─────────────┤
-      │ O  R  S     │  ← 3 wires
-      │ r  e  i     │
-      │ a  d  g     │
-      │ n        n  │
-      │ g        a  │
-      │ e        l  │
-      └─────────────┘
+GS-1502 Servo            ESP32-C3
+─────────────            ────────
+Black (GND)          →   GND
+Red (VCC)            →   3.3V or LiPo+ (3.7-5V OK)
+White (Signal)       →   GPIO4
 ```
+
+**Servo Comparison:**
+| Model | Voltage | Type | Size | Best For |
+|-------|---------|------|------|----------|
+| SG90 | 4.8-6V | Rotary | 23x12x29mm | Standard build, USB power |
+| GS-1502 | 3.7-5V | Linear | 21x15x12mm | Compact build, LiPo direct |
 
 **Control:**
 - Servo controlled by Joy1 X-axis (0-4095 → 0-180°)
@@ -278,9 +278,8 @@ Orange/Yellow (Signal)→  GPIO4
 - Use for steering, camera pan, or other angular control
 
 **Power Note:**
-- Servo draws ~100-500mA depending on load
-- Can use ESP32 5V pin for light loads
-- For heavy loads or multiple servos, use external 5V power supply
+- SG90 draws ~100-500mA, needs 5V (boost converter if on LiPo)
+- GS-1502 draws ~50-150mA, works directly from 1S LiPo (no boost needed)
 
 ### Step 3: Connect MX1508 Motor Driver
 
@@ -492,16 +491,21 @@ Both boards can run on single-cell LiPo batteries (3.7V nominal) for portable op
 
 ## RX: LiPo Battery Circuit
 
-**⚠️ RX is more complex because servo needs 5V!**
+**Complexity depends on servo choice:**
 
-The servo (SG90) requires 5V to operate properly. LiPo provides 3.7V, so you need a boost converter.
+| Servo | Voltage | MT3608 Needed? |
+|-------|---------|----------------|
+| SG90/MG90S | 4.8-6V | Yes |
+| **GS-1502** | 3.7-5V | **No** (recommended) |
+
+If using **GS-1502**, skip the MT3608 section - connect servo directly to LiPo!
 
 ### Components Needed
 
 | Qty | Component | Purpose |
 |-----|-----------|---------|
 | 1 | 1S LiPo Battery (3.7V, 1000-2000mAh) | Power source |
-| 1 | MT3608 Boost Converter | 3.7V → 5V for servo/motors |
+| 1 | MT3608 Boost Converter | 3.7V → 5V (only if SG90 servo) |
 | 2 | 10K Resistors | Voltage divider for monitoring |
 | 1 | 1000µF Electrolytic Capacitor | Motor power smoothing |
 | 2 | 100µF Electrolytic Capacitor | ESP32 + boost converter smoothing |
@@ -520,9 +524,15 @@ The servo (SG90) requires 5V to operate properly. LiPo provides 3.7V, so you nee
 
 *See [diagrams/rx-lipo-power.svg](diagrams/rx-lipo-power.svg) for detailed schematic*
 
-**Key connections:**
+**Key connections (SG90 servo):**
 - LiPo → MT3608 boost converter → 5V for servo and motors
 - LiPo → ESP32 VIN directly (internal 3.3V regulator)
+- Voltage divider on GPIO10 for battery monitoring
+
+**Simplified connections (GS-1502 servo):**
+- LiPo → servo VCC directly (no boost needed)
+- LiPo → ESP32 VIN directly
+- LiPo → motors via driver (3.7V OK for most motors)
 - Voltage divider on GPIO10 for battery monitoring
 
 ### MT3608 Boost Converter Setup
@@ -858,7 +868,7 @@ Why:
 | 2 | HW-504 Joystick Module | Analog XY + button |
 | 1 | 1.9" OLED 128x64 (SSD1306) | TX display, I2C, 3.3V |
 | 1 | 1.3" OLED 128x64 (SH1106) | RX display, I2C, 3.3V |
-| 1 | SG90 Servo (or compatible) | Controlled by Joy1 X-axis |
+| 1 | Servo: SG90 or GS-1502 | Joy1 X-axis (GS-1502 works at 3.7V) |
 | 1 | MX1508 Motor Driver | Dual H-bridge |
 | 2 | DC Motor 3.7V | Any small DC motor |
 | 1 | 2N2222 NPN Transistor | Motor enable circuit (prevents boot twitch) |
@@ -883,7 +893,7 @@ Why:
 |-----|-----------|---------|
 | 1 | 1S LiPo Battery 500-1000mAh | TX power source |
 | 1 | 1S LiPo Battery 1000-2000mAh | RX power source |
-| 1 | MT3608 Boost Converter | 3.7V→5V for RX servo/motors |
+| 1 | MT3608 Boost Converter | 3.7V→5V (only if SG90, not needed for GS-1502) |
 | 4 | 10K Resistor | Voltage dividers (2 per board) |
 | 2 | 100µF Electrolytic Capacitor | Power smoothing |
 | 2 | 0.1µF Ceramic Capacitor | High-freq noise filtering |

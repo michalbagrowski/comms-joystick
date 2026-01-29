@@ -5,8 +5,8 @@
 | Build | Components | Est. Cost |
 |-------|------------|-----------|
 | Standard TX + RX | Full-size modules | ~$50 |
-| Standard TX + Compact RX | Mixed | ~$40 |
-| Compact RX only | Miniaturized | ~$28 |
+| Standard TX + Compact RX | Mixed | ~$34 |
+| Compact RX only | Miniaturized | ~$20 |
 
 ---
 
@@ -63,21 +63,21 @@ Use standard TX build above (~$14)
 | 1 | **Seeed XIAO ESP32-C3** | 21x17mm | $5 | Built-in LiPo charging! |
 | 1 | **DRV8833 Breakout** | 10x15mm | $2 | Has nSLEEP pin |
 | 2 | Micro DC Motors | N20 or smaller | $3 | |
-| 1 | Micro Linear Servo | ~20x10mm | $8 | PZ-15320 or similar |
+| 1 | **GS-1502 Linear Servo** | 21x15x12mm | $3-4 | 3.7-5V, no boost needed |
 | 1 | LiPo Battery | 100-200mAh, 1S | $4 | 501220 or 602025 size |
 | 1 | **1S LiPo Protection PCB** | 5x10mm | $0.30 | **Required for safety** |
 | 2 | 10K Resistor | 0402 or 0603 SMD | $0.10 | Voltage divider |
 | 1 | 100uF Capacitor | SMD or small | $0.20 | Power smoothing |
 | - | 30AWG Silicone Wire | Thin, flexible | $2 | |
 
-**RX Compact Subtotal: ~$25**
+**RX Compact Subtotal: ~$20**
 
 ### Optional - Compact Build
 
 | Qty | Component | Purpose | Est. Price |
 |-----|-----------|---------|------------|
 | 1 | 0.42" OLED Display | Debugging only | $4 |
-| 1 | MT3608 Mini Boost | 5V for servo | $1 |
+| 1 | MT3608 Mini Boost | 5V for servo (only if PZ-15320) | $1 |
 | 1 | Slide Switch | Power on/off | $0.50 |
 | 1 | JST 1.25mm Connector | Battery plug | $0.30 |
 
@@ -135,23 +135,36 @@ Recommended: **501220** (good balance of size/capacity) or **602025** (longer ru
 
 ---
 
-## LiPo Battery Components (Both Builds)
+## LiPo Battery Components
 
 For portable operation with LiPo battery:
 
 | Qty | Component | Purpose | Est. Price |
 |-----|-----------|---------|------------|
-| 1 | 1S LiPo Battery | TX: 500-1000mAh, RX: 100-200mAh | $4-8 |
-| 2 | **1S LiPo Protection PCB** | **Over-discharge protection (1 per board)** | $0.60 |
+| 1-2 | 1S LiPo Battery | TX: 500-1000mAh, RX: 100-200mAh | $4-8 |
+| 1-2 | **1S LiPo Protection PCB** | **Over-discharge protection (1 per board)** | $0.30 ea |
 | 4 | 10K Resistor | Voltage dividers (2 per board) | $0.20 |
 | 2 | 100uF Electrolytic Cap | Power smoothing | $0.30 |
 | 2 | 0.1uF Ceramic Cap | High-freq filtering | $0.10 |
-| 1 | MT3608 Boost Converter | 5V for RX servo (standard build) | $1 |
-| 1 | TP4056 Charger Module | LiPo charging (standard build TX) | $1 |
 | 2 | Slide Switch SPDT | Power on/off | $0.50 |
 | 2 | JST-PH 2.0 Connector | Battery plug (optional) | $0.30 |
 
-**Note:** XIAO ESP32-C3 has built-in LiPo charging - no TP4056 needed for compact build!
+### Charging Modules (depends on board)
+
+| Board | Built-in Charging? | Needs TP4056? |
+|-------|-------------------|---------------|
+| ESP32-C3 Super Mini | NO | Yes ($1) |
+| Seeed XIAO ESP32-C3 | YES (battery pads) | No |
+
+### Boost Converter (depends on setup)
+
+| Component | When Needed | Est. Price |
+|-----------|-------------|------------|
+| MT3608 | RX on LiPo + 5V servo (SG90/MG90S) | $1 |
+
+**NOT needed if:**
+- RX powered by 5V adapter (recommended for standard build)
+- OR using GS-1502 servo (3.7-5V compatible, recommended for compact build)
 
 ---
 
@@ -166,8 +179,10 @@ For portable operation with LiPo battery:
 ### Compact Build (Linear Servos)
 | Model | Size | Stroke | Voltage | Price |
 |-------|------|--------|---------|-------|
+| **GS-1502** | 21x15x12mm | ~5mm | 3.7-5V | $3-4 |
 | PZ-15320 | 23x12x6mm | 20mm | 4.8-6V | $8 |
-| Micro Linear | ~20x8mm | 10-15mm | 3-6V | $6-10 |
+
+**Recommended: GS-1502** - Works directly from 1S LiPo (no boost converter needed), ultra-light (1.5g)
 
 ---
 
@@ -209,8 +224,8 @@ FOR LIPO OPERATION (optional):
 2x 1S LiPo Battery (TX: 500-1000mAh, RX: 1000-2000mAh)
 2x 1S LiPo Protection PCB 5x10mm  <-- REQUIRED FOR SAFETY
 4x 10K Resistor (voltage dividers)
-1x MT3608 Boost Converter (RX only)
-1x TP4056 Charger Module (TX only)
+2x TP4056 Charger Module (ESP32-C3 Super Mini has no built-in charging)
+1x MT3608 Boost Converter (RX only, if LiPo + 5V servo)
 2x Slide Switch SPDT
 2x 100uF Electrolytic Capacitor
 2x 0.1uF Ceramic Capacitor
@@ -231,7 +246,7 @@ RECOMMENDED:
 1x Seeed XIAO ESP32-C3
 1x DRV8833 dual motor driver breakout
 2x N20 micro gear motor 3-6V
-1x Micro linear servo (or PZ-15320)
+1x GS-1502 linear servo (3.7-5V, no boost needed)
 1x 501220 LiPo battery 100mAh (or 602025 200mAh)
 1x 1S LiPo Protection PCB 5x10mm  <-- REQUIRED FOR SAFETY
 2x 10K resistor 0402 or 0603
@@ -241,6 +256,8 @@ RECOMMENDED:
 OPTIONAL:
 1x 0.42" OLED 72x40 I2C (debugging)
 1x Slide switch (power on/off)
+
+Note: GS-1502 works at 3.7V - no MT3608 boost converter needed!
 ```
 
 ---
@@ -257,9 +274,11 @@ OPTIONAL:
 | LiPo Batteries | AliExpress (search by size code) |
 | **1S Protection PCB** | AliExpress ("1S 3.7V protection board") |
 | OLED Displays | AliExpress, Amazon |
-| Servos | Amazon, HobbyKing |
+| **GS-1502 Servo** | AliExpress, Amazon ("GS-1502 linear servo") |
+| SG90/MG90S Servos | Amazon, HobbyKing |
 | Capacitors/Resistors | LCSC, Mouser, DigiKey |
-| TP4056/MT3608 | AliExpress |
+| TP4056 Charger | AliExpress (not needed for XIAO - has built-in) |
+| MT3608 Boost | AliExpress (not needed with GS-1502) |
 
 ---
 
@@ -276,6 +295,6 @@ OPTIONAL:
 
 ---
 
-**Document Version:** 1.1
-**Last Updated:** 2026-01-28
-**Changes:** Added LiPo protection PCB as required component, reorganized LiPo section
+**Document Version:** 1.3
+**Last Updated:** 2026-01-29
+**Changes:** Added GS-1502 as recommended servo for compact build (3.7-5V, no boost needed), updated costs

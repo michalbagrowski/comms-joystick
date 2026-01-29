@@ -4,7 +4,7 @@
 // Miniaturized build for small chassis (Hot Wheels size)
 // - Seeed XIAO ESP32-C3 (21x17mm, built-in LiPo charging)
 // - DRV8833 motor driver (10x15mm, nSLEEP replaces transistor)
-// - Small linear servo
+// - GS-1502 linear servo (3.7-5V, no boost needed)
 // - Optional 0.42" OLED (removable for final build)
 //
 // COMPILE-TIME COMMUNICATION MODE SWITCH
