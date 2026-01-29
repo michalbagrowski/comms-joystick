@@ -192,12 +192,15 @@ void drawBatteryIcon(int x, int y) {
   int percent = getBatteryPercent();
   display.drawRect(x, y, 14, 8, SSD1306_WHITE);
   display.fillRect(x + 14, y + 2, 2, 4, SSD1306_WHITE);
+  // Fill level (0-3 bars): maps 0-100% to 0-3 with rounding
+  // Formula: (percent + 16) / 33 distributes evenly: 0-16%=0, 17-49%=1, 50-82%=2, 83-100%=3
   int bars = (percent + 16) / 33;
   if (bars > 0) display.fillRect(x + 2, y + 2, 3, 4, SSD1306_WHITE);
   if (bars > 1) display.fillRect(x + 6, y + 2, 3, 4, SSD1306_WHITE);
   if (bars > 2) display.fillRect(x + 10, y + 2, 2, 4, SSD1306_WHITE);
+  // Blink warning: draw outer border that flashes (doesn't obscure level bars)
   if (lowBatteryWarning && (millis() / 500) % 2 == 0) {
-    display.fillRect(x, y, 14, 8, SSD1306_INVERSE);
+    display.drawRect(x - 1, y - 1, 16, 10, SSD1306_WHITE);
   }
 }
 #endif
