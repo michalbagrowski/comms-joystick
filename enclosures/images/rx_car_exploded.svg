@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 450" width="500" height="450">
+  <defs>
+    <linearGradient id="lidGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e74c3c"/>
+      <stop offset="100%" style="stop-color:#c0392b"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d63031"/>
+      <stop offset="100%" style="stop-color:#a02525"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="250" y="20" text-anchor="middle" font-family="Arial" font-size="14" fill="#333">RX Car Chassis - Exploded Assembly View</text>
+
+  <!-- TOP LID -->
+  <g transform="translate(150, 40)">
+    <!-- Lid shape (isometric) -->
+    <path d="M0,15 L20,0 L180,0 L160,15 L160,60 L140,75 L20,75 L0,60 Z"
+          fill="url(#lidGrad)" stroke="#922" stroke-width="2"/>
+    <path d="M20,0 L180,0 L160,15 L0,15 Z" fill="#e85a4f" stroke="#922"/>
+
+    <!-- Vent slots -->
+    <rect x="60" y="8" width="30" height="4" rx="1" fill="#722"/>
+    <rect x="100" y="8" width="30" height="4" rx="1" fill="#722"/>
+
+    <!-- Servo arm slot -->
+    <rect x="70" y="50" width="20" height="15" fill="#722" stroke="#622"/>
+
+    <!-- Label -->
+    <text x="90" y="100" text-anchor="middle" font-family="Arial" font-size="10" fill="#666">LID</text>
+  </g>
+
+  <!-- COMPONENTS LAYER -->
+  <g transform="translate(100, 150)">
+    <!-- Servo -->
+    <g transform="translate(90, 0)">
+      <rect x="0" y="0" width="40" height="25" rx="2" fill="#333" stroke="#222"/>
+      <rect x="15" y="-12" width="10" height="15" fill="#555"/>
+      <text x="20" y="38" text-anchor="middle" font-family="Arial" font-size="7" fill="#666">GS-1502</text>
+    </g>
+
+    <!-- XIAO ESP32 -->
+    <g transform="translate(40, 45)">
+      <rect x="0" y="0" width="35" height="30" rx="2" fill="#1a6a1a" stroke="#333"/>
+      <rect x="30" y="10" width="8" height="10" fill="#888"/>
+      <text x="17" y="17" text-anchor="middle" font-family="Arial" font-size="6" fill="#fff">XIAO</text>
+      <text x="17" y="45" text-anchor="middle" font-family="Arial" font-size="7" fill="#666">ESP32-C3</text>
+    </g>
+
+    <!-- DRV8833 -->
+    <g transform="translate(100, 50)">
+      <rect x="0" y="0" width="25" height="18" rx="2" fill="#1a1a6a" stroke="#333"/>
+      <text x="12" y="12" text-anchor="middle" font-family="Arial" font-size="5" fill="#fff">DRV8833</text>
+    </g>
+
+    <!-- Battery -->
+    <g transform="translate(145, 45)">
+      <rect x="0" y="0" width="45" height="25" rx="3" fill="#3a3a9a" stroke="#333"/>
+      <rect x="45" y="8" width="4" height="8" fill="#666"/>
+      <text x="22" y="15" text-anchor="middle" font-family="Arial" font-size="6" fill="#fff">LiPo</text>
+      <text x="22" y="40" text-anchor="middle" font-family="Arial" font-size="7" fill="#666">100mAh</text>
+    </g>
+
+    <!-- Motors -->
+    <g transform="translate(50, 95)">
+      <ellipse cx="15" cy="12" rx="10" ry="15" fill="#444" stroke="#333"/>
+      <rect x="10" y="27" width="10" height="8" fill="#555"/>
+      <text x="15" y="50" text-anchor="middle" font-family="Arial" font-size="6" fill="#666">Motor 1</text>
+    </g>
+
+    <g transform="translate(145, 95)">
+      <ellipse cx="15" cy="12" rx="10" ry="15" fill="#444" stroke="#333"/>
+      <rect x="10" y="27" width="10" height="8" fill="#555"/>
+      <text x="15" y="50" text-anchor="middle" font-family="Arial" font-size="6" fill="#666">Motor 2</text>
+    </g>
+  </g>
+
+  <!-- CHASSIS BOTTOM -->
+  <g transform="translate(150, 310)">
+    <!-- Bottom shape (isometric) -->
+    <path d="M0,15 L20,0 L180,0 L160,15 L160,80 L140,95 L20,95 L0,80 Z"
+          fill="url(#bodyGrad)" stroke="#722" stroke-width="2"/>
+
+    <!-- Interior cavity -->
+    <path d="M15,20 L30,10 L150,10 L165,20 L165,70 L150,80 L30,80 L15,70 Z"
+          fill="#4a1a1a" stroke="#622"/>
+
+    <!-- Wheel well cutouts -->
+    <ellipse cx="5" cy="25" rx="15" ry="8" fill="#2a0a0a" stroke="#622"/>
+    <ellipse cx="175" cy="25" rx="15" ry="8" fill="#2a0a0a" stroke="#622"/>
+    <ellipse cx="5" cy="70" rx="15" ry="8" fill="#2a0a0a" stroke="#622"/>
+    <ellipse cx="175" cy="70" rx="15" ry="8" fill="#2a0a0a" stroke="#622"/>
+
+    <!-- Motor mounts -->
+    <rect x="30" y="55" width="30" height="20" rx="3" fill="#3a1a1a" stroke="#622"/>
+    <rect x="120" y="55" width="30" height="20" rx="3" fill="#3a1a1a" stroke="#622"/>
+
+    <!-- Screw posts -->
+    <circle cx="35" cy="45" r="4" fill="#4a2a2a" stroke="#622"/>
+    <circle cx="145" cy="45" r="4" fill="#4a2a2a" stroke="#622"/>
+
+    <!-- Label -->
+    <text x="90" y="115" text-anchor="middle" font-family="Arial" font-size="10" fill="#666">CHASSIS BOTTOM</text>
+  </g>
+
+  <!-- WHEELS -->
+  <g transform="translate(370, 180)">
+    <text x="40" y="0" text-anchor="middle" font-family="Arial" font-size="10" fill="#666">WHEELS (x4)</text>
+
+    <!-- Wheel -->
+    <g transform="translate(10, 20)">
+      <ellipse cx="30" cy="30" rx="25" ry="25" fill="#2c2c2c" stroke="#1a1a1a" stroke-width="2"/>
+      <ellipse cx="30" cy="30" rx="18" ry="18" fill="#3c3c3c" stroke="#2c2c2c"/>
+      <ellipse cx="30" cy="30" rx="8" ry="8" fill="#4c4c4c" stroke="#3c3c3c"/>
+      <circle cx="30" cy="30" r="2" fill="#666"/>
+    </g>
+
+    <text x="40" y="95" text-anchor="middle" font-family="Arial" font-size="8" fill="#888">20mm dia</text>
+  </g>
+
+  <!-- AXLES -->
+  <g transform="translate(370, 300)">
+    <text x="40" y="0" text-anchor="middle" font-family="Arial" font-size="10" fill="#666">AXLES (x2)</text>
+
+    <line x1="10" y1="25" x2="70" y2="25" stroke="#888" stroke-width="3"/>
+    <circle cx="10" cy="25" r="3" fill="#888"/>
+    <circle cx="70" cy="25" r="3" fill="#888"/>
+
+    <text x="40" y="45" text-anchor="middle" font-family="Arial" font-size="8" fill="#888">2mm steel rod</text>
+    <text x="40" y="57" text-anchor="middle" font-family="Arial" font-size="8" fill="#888">50mm length</text>
+  </g>
+
+  <!-- Assembly arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#e74c3c"/>
+    </marker>
+  </defs>
+
+  <g fill="none" stroke="#e74c3c" stroke-width="2">
+    <path d="M240,130 L240,145" marker-end="url(#arrow)"/>
+    <path d="M240,280 L240,305" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Assembly notes -->
+  <g font-family="Arial" font-size="8" fill="#666">
+    <text x="20" y="80">1. Print all parts</text>
+    <text x="20" y="95">2. Install motors in mounts</text>
+    <text x="20" y="110">3. Install servo</text>
+    <text x="20" y="125">4. Wire electronics</text>
+    <text x="20" y="140">5. Install battery</text>
+    <text x="20" y="155">6. Close lid</text>
+    <text x="20" y="170">7. Add wheels + axles</text>
+  </g>
+</svg>
